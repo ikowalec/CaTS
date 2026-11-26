@@ -1,0 +1,37 @@
+#!/bin/bash --login
+#SBATCH -n 40
+#SBATCH --mem-per-cpu=4000
+#SBATCH --tasks-per-node=40
+#SBATCH -o o.%J
+#SBATCH -e e.%J
+#SBATCH -t 0-1:00
+#SBATCH -p dev
+#SBATCH --account=<account>
+
+# Load the environment
+module purge
+module load mpi/openmpi/4.1.1
+
+# Set up the path to the ORCA binary
+export ORCA_BINARY=/scratch/$USER/ORCA/orca_5_0_4_linux_full/orca
+
+# Bug related to UCX gives errors for each CPU at the beginning of ORCA job #
+# [ccs0135][[61172,1],24][btl_openib_component.c:1704:init_one_device] error obtaining device attributes for
+# mlx5_0 errno says Protocol not supported
+# Jobs run as normal, although performance might be compromised #
+
+# Ensure that the job runs from the /scratch space
+export TEMP_DIRECTORY="/scratch/$USER/ORCA.$SLURM_JOB_ID"
+export HOME_DIRECTORY=$PWD
+mkdir $TEMP_DIRECTORY
+# this initial folder sync should exclude unnecessary files to avoid I/O overhead
+rsync -av --exclude='*.out' . $TEMP_DIRECTORY
+cd $TEMP_DIRECTORY
+
+# Run the QM code
+time $ORCA_BINARY input_file
+
+# Clear out the working directory after the job is completed #
+rm e.$SLURM_JOB_ID o.$SLURM_JOB_ID
+cp $TEMP_DIRECTORY/* $HOME_DIRECTORY -r
+rm $TEMP_DIRECTORY -r

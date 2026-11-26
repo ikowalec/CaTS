@@ -1,0 +1,35 @@
+# Direct application dependencies matched to the repository's Python 3.12 venv.
+# This is not a complete environment lock or a remote calculation environment.
+Django==5.2.11
+django-environ==0.13.0
+djangorestframework==3.16.1
+django-filter==25.2
+django-tables2==2.8.0
+celery==5.6.2
+kombu==5.6.2
+redis==7.2.0
+django-celery-results==2.6.0
+django-celery-beat==2.8.1
+whitenoise==6.11.0
+
+# Local structure handling, analysis and rendering.
+ase==3.26.0
+numpy==2.3.5
+scipy==1.17.1
+matplotlib==3.10.6
+scikit-image==0.26.0
+scikit-learn==1.7.2
+dscribe==2.1.2
+plotly==6.0.0
+pandas==2.3.2
+Markdown==3.10.2
+Pillow==12.1.1
+xyzrender==0.1.2
+python-dotenv==1.0.1
+
+# Browser viewer: declared previously, not installed in the inspected venv.
+py3Dmol>=2.5,<2.6
+
+# Local checks.
+pytest==9.0.3
+pytest-django==4.12.0

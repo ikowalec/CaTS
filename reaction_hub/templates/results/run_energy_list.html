@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<style>
+  .results-hero { display:flex; justify-content:space-between; gap:18px; align-items:flex-start; }
+  .results-hero h2 { margin:0 0 5px; color:#0f172a; }
+  .results-hero p { margin:0; }
+  .results-count { min-width:120px; text-align:right; color:#475569; }
+  .results-count strong { display:block; color:#0f172a; font-size:1.7rem; line-height:1; }
+  .filter-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:14px; margin-top:18px; }
+  .filter-field label, .filter-label { display:block; margin-bottom:5px; color:#334155; font-size:.82rem; font-weight:700; }
+  .filter-field input, .filter-field select { box-sizing:border-box; width:100%; min-height:38px; border:1px solid #cbd5e1; border-radius:7px; background:#fff; }
+  .filter-field input:focus, .filter-field select:focus { outline:2px solid #bfdbfe; border-color:#2563eb; }
+  .filter-span-2 { grid-column:span 2; }
+  .range-inputs { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .filter-details { border:1px solid #cbd5e1; border-radius:7px; background:#fff; }
+  .filter-details summary { cursor:pointer; min-height:36px; box-sizing:border-box; padding:9px 10px; color:#334155; font-size:.88rem; }
+  .filter-options { max-height:190px; overflow:auto; border-top:1px solid #e2e8f0; padding:7px 10px; }
+  .filter-options label { display:flex; align-items:flex-start; gap:7px; padding:5px 0; font-size:.85rem; font-weight:400; }
+  .filter-options input { width:auto; min-height:0; margin-top:2px; }
+  .filter-actions { display:flex; flex-wrap:wrap; align-items:center; gap:9px; margin-top:16px; }
+  .button, button.button { display:inline-flex; align-items:center; justify-content:center; min-height:36px; box-sizing:border-box; padding:7px 14px; border:1px solid #1d4ed8; border-radius:7px; background:#2563eb; color:#fff; text-decoration:none; font-weight:700; cursor:pointer; }
+  .button:hover, button.button:hover { background:#1d4ed8; }
+  .button-secondary { border-color:#cbd5e1; background:#fff; color:#334155; }
+  .button-secondary:hover { background:#f8fafc; color:#0f172a; }
+  .button-quiet { border-color:transparent; background:transparent; color:#475569; }
+  .button-quiet:hover { background:#f1f5f9; color:#0f172a; }
+  .active-filters { display:flex; flex-wrap:wrap; gap:6px; margin-top:14px; }
+  .filter-chip, .data-badge, .status-badge { display:inline-flex; align-items:center; border-radius:999px; font-size:.74rem; font-weight:700; white-space:nowrap; }
+  .filter-chip { padding:4px 9px; background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; }
+  .results-toolbar { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:10px; margin-bottom:12px; }
+  .selection-actions { display:flex; align-items:center; gap:10px; }
+  .energy-table { font-size:.88rem; }
+  .energy-table thead th { position:sticky; top:0; z-index:1; background:#f8fafc; color:#334155; white-space:nowrap; }
+  .energy-table tbody tr:hover { background:#f8fafc; }
+  .energy-table td { vertical-align:top; }
+  .run-link { color:#1d4ed8; font-weight:700; text-decoration:none; }
+  .run-link:hover { text-decoration:underline; }
+  .cell-subtle { color:#64748b; font-size:.78rem; }
+  .data-badges { display:flex; flex-wrap:wrap; gap:4px; min-width:140px; }
+  .data-badge { padding:3px 7px; background:#ecfeff; border:1px solid #a5f3fc; color:#155e75; }
+  .data-badge-ct { background:#faf5ff; border-color:#e9d5ff; color:#7e22ce; }
+  .data-badge-atomization, .data-badge-mixing, .data-badge-adsorption { background:#f0fdf4; border-color:#bbf7d0; color:#166534; }
+  .status-badge { padding:3px 8px; background:#f1f5f9; color:#475569; }
+  .status-badge.status-completed { background:#dcfce7; color:#166534; }
+  .status-badge.status-failed { background:#fee2e2; color:#991b1b; }
+  .status-badge.status-running { background:#ccfbf1; color:#115e59; }
+  .results-pagination { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:14px; }
+  .results-pagination nav { display:flex; gap:7px; }
+  @media (max-width:700px) {
+    .results-hero { display:block; }
+    .results-count { text-align:left; margin-top:12px; }
+    .filter-span-2 { grid-column:span 1; }
+  }
+</style>
+{% endblock %}
+{% block content %}
+<section class="card">
+  <div class="results-hero">
+    <div>
+      <h2>Run energies</h2>
+      <p class="muted">Search structures by chemistry, provenance, calculation settings, and available result data.</p>
+    </div>
+    <div class="results-count"><strong>{{ result_count }}</strong>matching run{{ result_count|pluralize }}</div>
+  </div>
+
+  <form method="get">
+    <div class="filter-grid">
+      <div class="filter-field">
+        <label for="prefix">Run name starts with</label>
+        <input id="prefix" name="prefix" value="{{ prefix }}" placeholder="e.g. Au63_" />
+      </div>
+      <div class="filter-field">
+        <label for="formula">Formula contains</label>
+        <input id="formula" name="formula" value="{{ formula }}" placeholder="e.g. Au63O2" />
+      </div>
+      <div class="filter-field">
+        <label for="species">Allowed atomic species</label>
+        <input id="species" name="species" value="{{ species|join:', ' }}" placeholder="Au, Cu, C, O" />
+      </div>
+      <div class="filter-field">
+        <label for="status">Status</label>
+        <select id="status" name="status">
+          <option value="">Any status</option>
+          {% for value, label in status_choices %}<option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="filter-field">
+        <label for="origin">Origin</label>
+        <select id="origin" name="origin">
+          <option value="">Any origin</option>
+          <option value="submitted" {% if origin == 'submitted' %}selected{% endif %}>Submitted calculations</option>
+          <option value="imported" {% if origin == 'imported' %}selected{% endif %}>Imported legacy data</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <span class="filter-label">Total energy range (eV)</span>
+        <div class="range-inputs">
+          <input aria-label="Minimum total energy" name="energy_min" value="{{ energy_min }}" inputmode="decimal" placeholder="Min" />
+          <input aria-label="Maximum total energy" name="energy_max" value="{{ energy_max }}" inputmode="decimal" placeholder="Max" />
+        </div>
+      </div>
+      <div class="filter-field">
+        <span class="filter-label">Settings used</span>
+        <details class="filter-details" {% if settings_profile_ids %}open{% endif %}>
+          <summary>{% if settings_profile_ids %}{{ settings_profile_ids|length }} selected{% else %}Any settings{% endif %}</summary>
+          <div class="filter-options">
+            {% for profile in settings_profiles %}
+              <label><input type="checkbox" name="settings_profile" value="{{ profile.pk }}" {% if profile.pk in settings_profile_ids %}checked{% endif %} />{{ profile.name }}</label>
+            {% endfor %}
+          </div>
+        </details>
+      </div>
+      <div class="filter-field">
+        <span class="filter-label">Workflow</span>
+        <details class="filter-details" {% if workflow_ids %}open{% endif %}>
+          <summary>{% if workflow_ids %}{{ workflow_ids|length }} selected{% else %}Any workflow{% endif %}</summary>
+          <div class="filter-options">
+            {% for workflow in workflows %}
+              <label><input type="checkbox" name="workflow" value="{{ workflow.pk }}" {% if workflow.pk in workflow_ids %}checked{% endif %} />{{ workflow.name }}</label>
+            {% endfor %}
+          </div>
+        </details>
+      </div>
+      <div class="filter-field filter-span-2">
+        <span class="filter-label">Must have data</span>
+        <div class="filter-details filter-options" style="display:flex;flex-wrap:wrap;gap:4px 16px;max-height:none;border-top:1px solid #cbd5e1;">
+          {% for key, label in data_filter_choices %}
+            <label><input type="checkbox" name="data" value="{{ key }}" {% if key in data_filters %}checked{% endif %} />{{ label }}</label>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <input type="hidden" name="sort" value="{{ sort }}" />
+    <div class="filter-actions">
+      <button class="button" type="submit">Apply filters</button>
+      <a class="button button-secondary" href="{% url 'result-run-energies' %}">Reset</a>
+      <a class="button button-quiet" href="{% url 'result-energy-basket' %}">Dataset checkout · {{ basket_count }}</a>
+    </div>
+    {% if active_filters %}
+      <div class="active-filters" aria-label="Active filters">
+        {% for label in active_filters %}<span class="filter-chip">{{ label }}</span>{% endfor %}
+      </div>
+    {% endif %}
+  </form>
+</section>
+
+<section class="card">
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="return_query" value="{{ return_query }}" />
+    <div class="results-toolbar">
+      <div class="selection-actions">
+        <button class="button" type="submit">Add selected</button>
+        <span class="muted" id="selected-run-count">0 selected on this page</span>
+      </div>
+      <span class="muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    </div>
+    <div class="table-container">
+      <table class="energy-table">
+        <thead>
+          <tr>
+            <th><input type="checkbox" id="select-all-run-energies" aria-label="Select all runs on this page" /></th>
+            <th><a href="?{% if query_without_sort %}{{ query_without_sort }}&{% endif %}sort={% if sort == 'run' %}-run{% else %}run{% endif %}">Run</a></th>
+            <th>Formula</th>
+            <th><a href="?{% if query_without_sort %}{{ query_without_sort }}&{% endif %}sort={% if sort == 'energy' %}-energy{% else %}energy{% endif %}">Total energy (eV)</a></th>
+            <th><a href="?{% if query_without_sort %}{{ query_without_sort }}&{% endif %}sort={% if sort == 'status' %}-status{% else %}status{% endif %}">Status</a></th>
+            <th>Available data</th>
+            <th>Workflow</th>
+            <th>Settings</th>
+            <th><a href="?{% if query_without_sort %}{{ query_without_sort }}&{% endif %}sort={% if sort == 'created' %}-created{% else %}created{% endif %}">Created</a></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for prop in rows %}
+          <tr>
+            <td><input type="checkbox" name="run_ids" value="{{ prop.workflow_run_id }}" data-run-energy-checkbox {% if prop.workflow_run_id in basket_ids %}checked{% endif %} /></td>
+            <td>
+              <a class="run-link" href="{% url 'workflow-run-detail' prop.workflow_run_id %}">{{ prop.workflow_run.run_name }}</a>
+              <div class="cell-subtle">#{{ prop.workflow_run_id }}</div>
+            </td>
+            <td>{{ prop.structure_formula|default:"-" }}</td>
+            <td>{{ prop.value_float|floatformat:6 }}</td>
+            <td><span class="status-badge status-{{ prop.workflow_run.status }}">{{ prop.workflow_run.get_status_display }}</span></td>
+            <td>
+              <div class="data-badges">
+                {% for item in prop.available_data %}<span class="data-badge data-badge-{{ item.key }}">{{ item.label }}</span>{% empty %}<span class="cell-subtle">Energy only</span>{% endfor %}
+              </div>
+            </td>
+            <td>{{ prop.workflow_run.workflow.name }}</td>
+            <td>{{ prop.workflow_run.settings_profile.name }}</td>
+            <td>{{ prop.workflow_run.created_at|date:"Y-m-d H:i" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="9" class="muted">No run energies match these filters. Try removing one of the required-data filters.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if page_obj.paginator.num_pages > 1 %}
+      <div class="results-pagination">
+        <span class="muted">Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ result_count }}</span>
+        <nav aria-label="Results pages">
+          {% if page_obj.has_previous %}<a class="button button-secondary" href="?{% if query_without_page %}{{ query_without_page }}&{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}
+          {% if page_obj.has_next %}<a class="button button-secondary" href="?{% if query_without_page %}{{ query_without_page }}&{% endif %}page={{ page_obj.next_page_number }}">Next</a>{% endif %}
+        </nav>
+      </div>
+    {% endif %}
+  </form>
+</section>
+<script>
+  (function () {
+    const toggle = document.getElementById("select-all-run-energies");
+    const count = document.getElementById("selected-run-count");
+    const boxes = Array.from(document.querySelectorAll("[data-run-energy-checkbox]"));
+    if (!toggle || boxes.length === 0) return;
+    function sync() {
+      const checked = boxes.filter((box) => box.checked).length;
+      toggle.checked = checked === boxes.length;
+      toggle.indeterminate = checked > 0 && checked < boxes.length;
+      count.textContent = checked + " selected on this page";
+    }
+    toggle.addEventListener("change", function () { boxes.forEach((box) => { box.checked = toggle.checked; }); sync(); });
+    boxes.forEach((box) => box.addEventListener("change", sync));
+    sync();
+  }());
+</script>
+{% endblock %}

@@ -1,0 +1,466 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  .campaign-header-card {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    color: #f8fafc;
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  }
+  .campaign-pills {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .campaign-pill {
+    padding: 8px 16px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.1);
+    color: #e2e8f0;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+  .campaign-pill:hover, .campaign-pill.active {
+    background: #3b82f6;
+    color: #ffffff;
+    border-color: #60a5fa;
+    box-shadow: 0 0 12px rgba(59,130,246,0.4);
+  }
+  .campaign-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin-top: 14px;
+  }
+  .campaign-card {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .campaign-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #60a5fa;
+    margin-bottom: 6px;
+  }
+  .campaign-meta {
+    font-size: 0.82rem;
+    color: #94a3b8;
+    margin-bottom: 10px;
+  }
+  .progress-bar-bg {
+    background: rgba(255,255,255,0.15);
+    border-radius: 6px;
+    height: 8px;
+    width: 100%;
+    overflow: hidden;
+    margin-top: 6px;
+  }
+  .progress-bar-fill {
+    background: linear-gradient(90deg, #3b82f6 0%, #10b981 100%);
+    height: 100%;
+    border-radius: 6px;
+    transition: width 0.4s ease;
+  }
+  .quota-gauge {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    background: rgba(15, 23, 42, 0.6);
+    border-radius: 8px;
+    padding: 12px 16px;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .quota-item {
+    display: flex;
+    flex-direction: column;
+  }
+  .quota-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #94a3b8;
+  }
+  .quota-val {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #10b981;
+  }
+</style>
+{% endblock %}
+{% block content %}
+
+<!-- Campaign Banner & Switcher -->
+<div class="campaign-header-card">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
+    <div>
+      <h2 style="margin:0;font-size:1.4rem;color:#ffffff;display:flex;align-items:center;gap:8px;">
+        <span style="color:#60a5fa;">🚀</span> Reaction Hub Research Campaigns
+      </h2>
+      <p style="margin:4px 0 0 0;font-size:0.88rem;color:#cbd5e1;">
+        Permanent high-throughput campaign screening, reservation resource tracking & workflow checkpoint management.
+      </p>
+    </div>
+    
+    <!-- HPC Reservation Resource Gauge -->
+    <div class="quota-gauge">
+      <div class="quota-item">
+        <span class="quota-label">CPU Nodes (active / usable / allocated)</span>
+        <span class="quota-val" style="color:#60a5fa;">{{ active_nodes_count }} / {{ max_nodes_quota }} / {{ reservation_nodes_allocated }}</span>
+        <small style="display:block;color:#94a3b8;">{{ reservation_nodes_reserved }} nodes held in reserve</small>
+      </div>
+      <div class="quota-item">
+        <span class="quota-label">GPU Jobs</span>
+        <span class="quota-val" style="color:#10b981;">{{ active_gpu_jobs }} / {{ max_gpu_quota }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Campaign Filter Pills -->
+  <div class="campaign-pills">
+    <a href="{% url 'dashboard-home' %}" class="campaign-pill {% if not request.GET.campaign %}active{% endif %}">
+      🌐 All Workflows
+    </a>
+    {% for item in campaigns %}
+    <a href="?campaign={{ item.instance.slug }}" class="campaign-pill {% if request.GET.campaign == item.instance.slug %}active{% endif %}">
+      📌 {{ item.instance.name }}
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- Active Campaigns Overview Cards -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;margin-bottom:6px;">
+    <span style="font-size:0.85rem;color:#cbd5e1;font-weight:600;">Active Campaign Tracks:</span>
+    <a href="{% url 'campaign-list' %}" style="font-size:0.85rem;color:#60a5fa;text-decoration:none;font-weight:700;">
+      View All Campaign Summaries & Ledgers →
+    </a>
+  </div>
+  <div class="campaign-grid">
+    {% for item in campaigns %}
+    <div class="campaign-card" style="{% if request.GET.campaign == item.instance.slug %}border-color:#60a5fa;background:rgba(59,130,246,0.12);{% endif %}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">
+        <div class="campaign-title">
+          <a href="{% url 'campaign-detail' slug=item.instance.slug %}" style="color:#60a5fa;text-decoration:none;">
+            {{ item.instance.name }}
+          </a>
+        </div>
+        <a href="{% url 'campaign-detail' slug=item.instance.slug %}" style="font-size:0.75rem;color:#93c5fd;text-decoration:none;background:rgba(255,255,255,0.1);padding:2px 8px;border-radius:4px;white-space:nowrap;">
+          Details →
+        </a>
+      </div>
+      <div class="campaign-meta">
+        <strong>Clusters:</strong> {{ item.instance.target_clusters|default:"All" }}<br />
+        <strong>Workflow Runs:</strong> {{ item.member_count }} | <strong>HPC Jobs:</strong> {{ item.job_count }}
+      </div>
+      <div style="font-size:0.8rem;color:#e2e8f0;display:flex;justify-content:space-between;margin-top:8px;">
+        <span>Checkpoint Progress</span>
+        <strong>Stage {{ item.completed_stage }} / {{ item.total_stage }} ({{ item.completion_pct }}%)</strong>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" style="width: {{ item.completion_pct }}%;"></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="card">
+  <h3>Quick Access & Actions</h3>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <a
+      style="display:inline-block;padding:6px 12px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;text-decoration:none;color:#0f172a;font-weight:500;"
+      href="/jobs/submit/"
+    >
+      + Submit Job
+    </a>
+    <a
+      style="display:inline-block;padding:6px 12px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;text-decoration:none;color:#0f172a;font-weight:500;"
+      href="/workflows/"
+    >
+      📋 Workflow Runs
+    </a>
+    <a
+      style="display:inline-block;padding:6px 12px;border:1px solid #1d4ed8;border-radius:6px;background:#2563eb;text-decoration:none;color:#fff;font-weight:500;"
+      href="/results/"
+    >
+      📊 Results & Spectra
+    </a>
+    <form id="sync-hpc-jobs-form" method="post" action="{% url 'dashboard-sync-hpc-jobs' %}" style="margin:0;">
+      {% csrf_token %}
+      <button
+        id="sync-hpc-jobs-button"
+        type="submit"
+        style="display:inline-block;padding:6px 12px;border:1px solid #047857;border-radius:6px;background:#059669;text-decoration:none;color:#fff;cursor:pointer;font-weight:500;"
+      >
+        ⚡ Sync HPC Jobs
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Job Overview -->
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
+    <h3 style="margin:0;">
+      {% if selected_campaign %}
+        HPC Job Overview ({{ selected_campaign.name }})
+      {% else %}
+        Global HPC Job Overview
+      {% endif %}
+    </h3>
+    {% if selected_campaign %}
+      <span style="font-size:0.85rem;color:#475569;background:#f1f5f9;padding:4px 12px;border-radius:12px;border:1px solid #cbd5e1;">
+        <strong>{{ selected_campaign.member_runs_count }}</strong> Workflow Runs Linked | <strong>{{ counts.total_jobs }}</strong> HPC Jobs Total
+      </span>
+    {% else %}
+      <span style="font-size:0.85rem;color:#475569;background:#f1f5f9;padding:4px 12px;border-radius:12px;border:1px solid #cbd5e1;">
+        <strong>{{ counts.total_jobs }}</strong> HPC Jobs Total
+      </span>
+    {% endif %}
+  </div>
+  <div class="grid">
+    <div class="metric"><span class="muted">Initiated</span><strong>{{ counts.initiated }}</strong></div>
+    <div class="metric"><span class="muted">Pending</span><strong>{{ counts.pending }}</strong></div>
+    <div class="metric"><span class="muted">Running</span><strong>{{ counts.running }}</strong></div>
+    <div class="metric"><span class="muted">Completed</span><strong>{{ counts.completed }}</strong></div>
+    <div class="metric"><span class="muted">Failed</span><strong>{{ counts.failed }}</strong></div>
+    <div class="metric"><span class="muted">Cancelled</span><strong>{{ counts.cancelled }}</strong></div>
+    <div class="metric"><span class="muted">Deleted</span><strong>{{ counts.deleted }}</strong></div>
+  </div>
+</div>
+
+<!-- Status Trend -->
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <div>
+      <h3 style="margin:0;">Status Trend (Last 14 Days) {% if selected_campaign %}({{ selected_campaign.name }}){% endif %}</h3>
+      <span class="muted" style="font-size:0.85rem;">Daily execution activity, completions, and HPC queue submissions</span>
+    </div>
+  </div>
+  <div id="status-trend" style="height:340px;"></div>
+</div>
+
+<!-- Recent Completed Jobs -->
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <h3 style="margin:0;">Recent Completions {% if selected_campaign %}({{ selected_campaign.name }}){% endif %}</h3>
+    <span class="muted" style="font-size:0.85rem;">Showing latest 10 runs</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Mode</th>
+        <th>Job ID</th>
+        <th>Job Name</th>
+        <th>Workflow Run</th>
+        <th>HPC</th>
+        <th>Completed At</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for job in recent_completed %}
+      <tr>
+        <td>
+          {% for label, color in job.mode_badges %}
+            <span style="display:inline-block;padding:3px 8px;border-radius:12px;font-size:0.75rem;font-weight:600;color:#fff;background:{{ color }};margin-right:2px;">
+              {{ label }}
+            </span>
+          {% empty %}
+            <span style="display:inline-block;padding:3px 8px;border-radius:12px;font-size:0.75rem;font-weight:600;color:#fff;background:{{ job.mode_badge_color }};">
+              {{ job.mode_badge_text }}
+            </span>
+          {% endfor %}
+        </td>
+        <td><a href="/jobs/{{ job.pk }}/" style="font-family:monospace;font-weight:600;">{{ job.scheduler_job_id|default:job.pk }}</a></td>
+        <td><strong style="color:#0f172a;">{{ job.job_name }}</strong></td>
+        <td>
+          {% if job.workflow_run %}
+            <a href="/workflows/{{ job.workflow_run.pk }}/">{{ job.workflow_run.run_name }}</a>
+          {% else %}
+            <span class="muted">-</span>
+          {% endif %}
+        </td>
+        <td><span style="font-size:0.85rem;color:#475569;">{{ job.hpc_system|default:"-" }}</span></td>
+        <td><span style="font-size:0.85rem;color:#64748b;">{{ job.completed_at|date:"Y-m-d H:i"|default:"-" }}</span></td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6" style="text-align:center;padding:24px;color:#94a3b8;">No completed jobs found for this view.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Failures Needing Attention -->
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
+    <div>
+      <h3 style="margin:0;color:#dc2626;">Failures Needing Attention {% if selected_campaign %}({{ selected_campaign.name }}){% endif %}</h3>
+      <span class="muted" style="font-size:0.85rem;">Review, 1-click retry, or clear failed/cancelled jobs</span>
+    </div>
+  </div>
+
+  <form method="post" action="{% url 'job-bulk-failed-action' %}">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}" />
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;background:#f8fafc;padding:8px 12px;border-radius:6px;border:1px solid #e2e8f0;align-items:center;">
+      <span style="font-size:0.85rem;font-weight:600;color:#475569;">Bulk Actions:</span>
+      <button type="submit" name="action" value="retry" style="padding:4px 10px;border-radius:4px;border:1px solid #2563eb;background:#3b82f6;color:#fff;cursor:pointer;font-size:0.82rem;">
+        🔄 Retry Selected
+      </button>
+      <button type="submit" name="action" value="delete" style="padding:4px 10px;border-radius:4px;border:1px solid #dc2626;background:#ef4444;color:#fff;cursor:pointer;font-size:0.82rem;">
+        🗑️ Delete Selected
+      </button>
+      <button type="submit" name="action" value="clear" style="padding:4px 10px;border-radius:4px;border:1px solid #cbd5e1;background:#ffffff;color:#475569;cursor:pointer;font-size:0.82rem;">
+        🧹 Clear Selected
+      </button>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width:30px;"><input type="checkbox" onclick="document.querySelectorAll('.job-chk').forEach(c=>c.checked=this.checked)" /></th>
+          <th>Mode</th>
+          <th>Job ID</th>
+          <th>Job Name</th>
+          <th>Workflow Run</th>
+          <th>HPC</th>
+          <th>Status</th>
+          <th>Updated</th>
+          <th style="text-align:right;">Quick Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for job in attention_needed %}
+        <tr>
+          <td><input type="checkbox" name="job_ids" value="{{ job.pk }}" class="job-chk" /></td>
+          <td>
+            {% for label, color in job.mode_badges %}
+              <span style="display:inline-block;padding:3px 8px;border-radius:12px;font-size:0.75rem;font-weight:600;color:#fff;background:{{ color }};margin-right:2px;">
+                {{ label }}
+              </span>
+            {% empty %}
+              <span style="display:inline-block;padding:3px 8px;border-radius:12px;font-size:0.75rem;font-weight:600;color:#fff;background:{{ job.mode_badge_color }};">
+                {{ job.mode_badge_text }}
+              </span>
+            {% endfor %}
+          </td>
+          <td><a href="/jobs/{{ job.pk }}/" style="font-family:monospace;font-weight:600;">{{ job.scheduler_job_id|default:job.pk }}</a></td>
+          <td><strong style="color:#0f172a;">{{ job.job_name }}</strong></td>
+          <td>
+            {% if job.workflow_run %}
+              <a href="/workflows/{{ job.workflow_run.pk }}/">{{ job.workflow_run.run_name }}</a>
+            {% else %}
+              <span class="muted">-</span>
+            {% endif %}
+          </td>
+          <td><span style="font-size:0.85rem;color:#475569;">{{ job.hpc_system|default:"-" }}</span></td>
+          <td>
+            <span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.78rem;font-weight:600;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;">
+              {{ job.status|upper }}
+            </span>
+          </td>
+          <td><span style="font-size:0.85rem;color:#64748b;">{{ job.updated_at|date:"Y-m-d H:i"|default:"-" }}</span></td>
+          <td style="text-align:right;">
+            <div style="display:inline-flex;gap:4px;">
+              <form method="post" action="{% url 'job-resubmit-failed' job.pk %}" style="display:inline;margin:0;">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}" />
+                <button type="submit" style="padding:3px 8px;border-radius:4px;border:1px solid #2563eb;background:#2563eb;color:#fff;font-size:0.78rem;cursor:pointer;" title="Retry this job">
+                  🔄 Retry
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="9" style="text-align:center;padding:24px;color:#10b981;font-weight:500;">🎉 No failed jobs needing attention! All systems running smoothly.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </form>
+</div>
+
+<script>
+  (function () {
+    const trendData = {{ trend|safe }};
+    if (trendData && trendData.labels_json) {
+      const labels = JSON.parse(trendData.labels_json);
+      const initiated = JSON.parse(trendData.initiated_json);
+      const running = JSON.parse(trendData.running_json);
+      const completed = JSON.parse(trendData.completed_json);
+      const failed = JSON.parse(trendData.failed_json);
+
+      const traces = [
+        {
+          x: labels,
+          y: completed,
+          name: 'Completed Jobs',
+          type: 'scatter',
+          mode: 'lines+markers',
+          fill: 'tozeroy',
+          fillcolor: 'rgba(16, 185, 129, 0.10)',
+          line: { color: '#10b981', width: 3, shape: 'spline' },
+          marker: { size: 6 }
+        },
+        {
+          x: labels,
+          y: running,
+          name: 'Running Jobs',
+          type: 'scatter',
+          mode: 'lines+markers',
+          line: { color: '#3b82f6', width: 2.5, shape: 'spline' },
+          marker: { size: 5 }
+        },
+        {
+          x: labels,
+          y: initiated,
+          name: 'Initiated / Queued',
+          type: 'scatter',
+          mode: 'lines+markers',
+          line: { color: '#8b5cf6', width: 2, shape: 'spline', dash: 'dot' },
+          marker: { size: 5 }
+        },
+        {
+          x: labels,
+          y: failed,
+          name: 'Failed / Cancelled',
+          type: 'scatter',
+          mode: 'lines+markers',
+          line: { color: '#ef4444', width: 2, shape: 'spline' },
+          marker: { size: 5 }
+        },
+      ];
+
+      Plotly.newPlot('status-trend', traces, {
+        margin: { t: 10, r: 20, b: 40, l: 45 },
+        hovermode: 'x unified',
+        legend: { orientation: 'h', y: 1.14, x: 0.0, font: { size: 12 } },
+        xaxis: {
+          showgrid: true,
+          gridcolor: '#e2e8f0',
+          tickformat: '%b %d',
+          tickfont: { size: 11, color: '#64748b' }
+        },
+        yaxis: {
+          showgrid: true,
+          gridcolor: '#e2e8f0',
+          zeroline: true,
+          zerolinecolor: '#cbd5e1',
+          tickfont: { size: 11, color: '#64748b' }
+        },
+        paper_bgcolor: 'transparent',
+        plot_bgcolor: 'transparent',
+      }, { responsive: true, displayModeBar: false });
+    }
+  })();
+</script>
+{% endblock %}

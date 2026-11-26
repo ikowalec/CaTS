@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% load django_tables2 %}
+{% block content %}
+<div class="card">
+  <h3>Adsorption Energy Results</h3>
+  <p class="muted">Need the full run dashboard and CSV export?</p>
+  <a href="{% url 'result-dashboard' %}">Open Adsorption Dashboard</a>
+  <span class="muted"> | </span>
+  <a href="{% url 'result-run-energies' %}">Build Energy Dataset</a>
+</div>
+<div class="card">
+  <h3>Filter Results</h3>
+  <form method="get">
+    <input type="hidden" name="page" value="1" />
+    {{ filter.form.as_p }}
+    <div class="form-row">
+      <label for="result-page-size">Rows per page</label><br />
+      <select id="result-page-size" name="page_size">
+        {% for size in page_size_options %}
+        <option value="{{ size }}" {% if page_size == size %}selected{% endif %}>{{ size }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit">Filter</button>
+  </form>
+</div>
+<div class="card">
+  {% render_table table %}
+</div>
+{% endblock %}

@@ -1,0 +1,2479 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+<style>
+  #coadsorbate-mode-panel .grid {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    align-items: start;
+  }
+  #coadsorbate-mode-panel .grid > div {
+    min-width: 0;
+  }
+  #coadsorbate-mode-panel textarea,
+  #coadsorbate-mode-panel input[type="text"],
+  #coadsorbate-mode-panel input[type="number"],
+  #coadsorbate-mode-panel select {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  #coadsorbate-mode-panel textarea {
+    min-height: 72px;
+    resize: vertical;
+  }
+  #coadsorbate-mode-panel input[type="file"] {
+    max-width: 100%;
+  }
+  .neb-section {
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #fff;
+  }
+  .neb-section h5 {
+    margin: 0 0 8px 0;
+    font-size: 0.98rem;
+  }
+  .neb-mode-note {
+    padding: 8px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #f8fafc;
+  }
+  #neb-mode-panel .grid {
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    align-items: start;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <h3>Submit HPC Job</h3>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+    <a
+      style="display:inline-block;padding:6px 10px;border:1px solid #1d4ed8;border-radius:6px;background:#2563eb;text-decoration:none;color:#fff;"
+      href="/results/"
+    >
+      Open Results
+    </a>
+  </div>
+  <p class="muted">
+    Upload structure, choose workflow/settings/HPC, and submit directly to scheduler.
+    Result recovery is automatic through scheduler sync + ingestion.
+  </p>
+
+  {% if form.errors %}
+  <div id="form-error-summary" style="background:#fee2e2;border:1px solid #ef4444;padding:10px;border-radius:6px;margin-bottom:12px;color:#991b1b;">
+    <div><strong>Submission failed. Please fix the following and submit again:</strong></div>
+    {% for err in form.non_field_errors %}
+      <div>{{ err }}</div>
+    {% endfor %}
+    {% for field in form %}
+      {% for err in field.errors %}
+      <div>{{ field.label }}: {{ err }}</div>
+      {% endfor %}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data" id="job-submit-form">
+    {% csrf_token %}
+    {{ form.source_run_id }}
+    {{ form.source_artifact_id }}
+    {{ form.neb_final_source_run_id }}
+    {{ form.neb_final_source_artifact_id }}
+
+    <div class="card" style="background:#f8fafc;">
+      <h4 style="margin-top:0;">Core Selection</h4>
+      <div class="grid">
+        <div>
+          <label>Run Name</label><br />
+          {{ form.run_name }}
+          {% if form.run_name.errors %}<div style="color:#b91c1c;">{{ form.run_name.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div>
+          <label>Run Mode</label><br />
+          {{ form.run_mode }}
+          <div class="muted">{{ form.run_mode.help_text }}</div>
+          {% if form.run_mode.errors %}<div style="color:#b91c1c;">{{ form.run_mode.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div>
+          <label>Workflow</label><br />
+          {{ form.workflow }}
+          {% if form.workflow.errors %}<div style="color:#b91c1c;">{{ form.workflow.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div>
+          <label>HPC System</label><br />
+          {{ form.hpc_system }}
+          {% if form.hpc_system.errors %}<div style="color:#b91c1c;">{{ form.hpc_system.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div id="qm-backend-wrap">
+          <label>QM Backend</label><br />
+          {{ form.qm_backend }}
+          <div class="muted">{{ form.qm_backend.help_text }}</div>
+          {% if form.qm_backend.errors %}<div style="color:#b91c1c;">{{ form.qm_backend.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div>
+          <label>Settings Profile</label><br />
+          {{ form.settings_profile }}
+          {% if form.settings_profile.errors %}<div style="color:#b91c1c;">{{ form.settings_profile.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div id="reference-intent-wrap">
+          <label>Reference Type</label><br />
+          {{ form.reference_intent }}
+          <div class="muted">{{ form.reference_intent.help_text }}</div>
+          {% if form.reference_intent.errors %}<div style="color:#b91c1c;">{{ form.reference_intent.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div id="reference-name-wrap" style="display:none;">
+          <label>Reference Name</label><br />
+          {{ form.reference_name }}
+          <div class="muted">{{ form.reference_name.help_text }}</div>
+          {% if form.reference_name.errors %}<div style="color:#b91c1c;">{{ form.reference_name.errors|join:", " }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="background:#f8fafc;">
+      <h4 style="margin-top:0;">Geometry</h4>
+      {% if prefill_source %}
+      <div style="padding:10px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;margin-bottom:10px;">
+        <strong>Prepopulated source:</strong>
+        Run <a href="/workflows/{{ prefill_source.run_id }}/">{{ prefill_source.run_name }}</a>
+        (workflow {{ prefill_source.workflow_name }}) using artifact
+        <code>{{ prefill_source.artifact_label }}</code>.
+      </div>
+      {% endif %}
+      {% if prefill_source_error %}
+      <div style="padding:10px;border:1px solid #ef4444;border-radius:8px;background:#fee2e2;margin-bottom:10px;color:#991b1b;">
+        {{ prefill_source_error }}
+      </div>
+      {% endif %}
+      <div>
+        <label>Geometry Source</label><br />
+        {{ form.geometry_source }}
+        <div class="muted">{{ form.geometry_source.help_text }}</div>
+        {% if form.geometry_source.errors %}<div style="color:#b91c1c;">{{ form.geometry_source.errors|join:", " }}</div>{% endif %}
+      </div>
+
+      <div id="geometry-upload-panel" class="grid" style="margin-top:10px;">
+        <div>
+          <label>Structure File</label><br />
+          {{ form.structure_file }}
+          <div class="muted">{{ form.structure_file.help_text }}</div>
+          {% if form.structure_file.errors %}<div style="color:#b91c1c;">{{ form.structure_file.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div>
+          <label>Trajectory Frame</label><br />
+          {{ form.traj_frame }}
+          <div class="muted">{{ form.traj_frame.help_text }}</div>
+          {% if form.traj_frame.errors %}<div style="color:#b91c1c;">{{ form.traj_frame.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div>
+          <label style="display:flex;align-items:center;gap:8px;">
+            {{ form.submit_all_traj_frames }}
+            Submit all trajectory frames
+          </label>
+          <div class="muted">{{ form.submit_all_traj_frames.help_text }}</div>
+          {% if form.submit_all_traj_frames.errors %}<div style="color:#b91c1c;">{{ form.submit_all_traj_frames.errors|join:", " }}</div>{% endif %}
+        </div>
+      </div>
+
+      <div id="geometry-ase-panel" style="display:none;margin-top:10px;">
+        <label>ASE Molecule Formula/Name</label><br />
+        {{ form.ase_molecule_formula }}
+        <div class="muted">{{ form.ase_molecule_formula.help_text }}</div>
+        {% if form.ase_molecule_formula.errors %}<div style="color:#b91c1c;">{{ form.ase_molecule_formula.errors|join:", " }}</div>{% endif %}
+      </div>
+
+      <div id="geometry-pubchem-panel" class="grid" style="display:none;margin-top:10px;">
+        <div>
+          <label>PubChem CID</label><br />
+          {{ form.pubchem_cid }}
+          <div class="muted">{{ form.pubchem_cid.help_text }}</div>
+          {% if form.pubchem_cid.errors %}<div style="color:#b91c1c;">{{ form.pubchem_cid.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div>
+          <label>PubChem Query</label><br />
+          {{ form.pubchem_query }}
+          <div class="muted">{{ form.pubchem_query.help_text }}</div>
+          {% if form.pubchem_query.errors %}<div style="color:#b91c1c;">{{ form.pubchem_query.errors|join:", " }}</div>{% endif %}
+        </div>
+      </div>
+
+      <div id="geometry-existing-panel" style="display:none;margin-top:10px;padding:10px;border:1px solid #cbd5e1;border-radius:8px;background:#ffffff;">
+        {% if prefill_source %}
+        <div><strong>Source Run:</strong> <a href="/workflows/{{ prefill_source.run_id }}/">{{ prefill_source.run_name }}</a></div>
+        <div><strong>Source Artifact:</strong> {{ prefill_source.artifact_label }}</div>
+        <div><strong>Source Path:</strong> <code>{{ prefill_source.artifact_path }}</code></div>
+        {% else %}
+        <div class="muted">
+          Existing-run source is set from "Use in New Submission" actions on Results/Workflow pages.
+          Batch submission from existing-run source is supported when the selected artifact is a `.traj` or `.db`.
+        </div>
+        {% endif %}
+      </div>
+      {% if form.source_run_id.errors or form.source_artifact_id.errors %}
+      <div style="color:#b91c1c;margin-top:8px;">
+        {{ form.source_run_id.errors|join:", " }} {{ form.source_artifact_id.errors|join:", " }}
+      </div>
+      {% endif %}
+
+      <div id="neb-final-image-panel" class="neb-section" style="display:none;">
+        <h4 style="margin:0 0 8px 0;">Endpoint Images</h4>
+        <div>
+          <label>Final Image Strategy</label><br />
+          {{ form.neb_final_image_strategy }}
+          <div class="muted">{{ form.neb_final_image_strategy.help_text }}</div>
+          {% if form.neb_final_image_strategy.errors %}<div style="color:#b91c1c;">{{ form.neb_final_image_strategy.errors|join:", " }}</div>{% endif %}
+        </div>
+
+        <div id="neb-final-explicit-panel" style="margin-top:8px;">
+          <div>
+            <label>Final Geometry Source</label><br />
+            {{ form.neb_final_geometry_source }}
+            <div class="muted">{{ form.neb_final_geometry_source.help_text }}</div>
+            {% if form.neb_final_geometry_source.errors %}<div style="color:#b91c1c;">{{ form.neb_final_geometry_source.errors|join:", " }}</div>{% endif %}
+          </div>
+
+          <div id="neb-final-upload-panel" class="grid" style="margin-top:8px;">
+            <div>
+              <label>Final Structure File</label><br />
+              {{ form.neb_final_structure_file }}
+              <div class="muted">{{ form.neb_final_structure_file.help_text }}</div>
+              {% if form.neb_final_structure_file.errors %}<div style="color:#b91c1c;">{{ form.neb_final_structure_file.errors|join:", " }}</div>{% endif %}
+            </div>
+            <div>
+              <label>Final Trajectory Frame</label><br />
+              {{ form.neb_final_traj_frame }}
+              <div class="muted">{{ form.neb_final_traj_frame.help_text }}</div>
+              {% if form.neb_final_traj_frame.errors %}<div style="color:#b91c1c;">{{ form.neb_final_traj_frame.errors|join:", " }}</div>{% endif %}
+            </div>
+          </div>
+
+          <div id="neb-final-ase-panel" style="display:none;margin-top:8px;">
+            <label>Final ASE Molecule Formula/Name</label><br />
+            {{ form.neb_final_ase_molecule_formula }}
+            <div class="muted">{{ form.neb_final_ase_molecule_formula.help_text }}</div>
+            {% if form.neb_final_ase_molecule_formula.errors %}<div style="color:#b91c1c;">{{ form.neb_final_ase_molecule_formula.errors|join:", " }}</div>{% endif %}
+          </div>
+
+          <div id="neb-final-pubchem-panel" class="grid" style="display:none;margin-top:8px;">
+            <div>
+              <label>Final PubChem CID</label><br />
+              {{ form.neb_final_pubchem_cid }}
+              <div class="muted">{{ form.neb_final_pubchem_cid.help_text }}</div>
+              {% if form.neb_final_pubchem_cid.errors %}<div style="color:#b91c1c;">{{ form.neb_final_pubchem_cid.errors|join:", " }}</div>{% endif %}
+            </div>
+            <div>
+              <label>Final PubChem Query</label><br />
+              {{ form.neb_final_pubchem_query }}
+              <div class="muted">{{ form.neb_final_pubchem_query.help_text }}</div>
+              {% if form.neb_final_pubchem_query.errors %}<div style="color:#b91c1c;">{{ form.neb_final_pubchem_query.errors|join:", " }}</div>{% endif %}
+            </div>
+          </div>
+
+          <div id="neb-final-existing-panel" style="display:none;margin-top:8px;padding:10px;border:1px solid #cbd5e1;border-radius:8px;background:#ffffff;">
+            {% if prefill_source %}
+            <div><strong>Final Source Run:</strong> <a href="/workflows/{{ prefill_source.run_id }}/">{{ prefill_source.run_name }}</a></div>
+            <div><strong>Final Source Artifact:</strong> {{ prefill_source.artifact_label }}</div>
+            <div><strong>Final Source Path:</strong> <code>{{ prefill_source.artifact_path }}</code></div>
+            {% else %}
+            <div class="muted">
+              Existing-run final source is set from "Use in New Submission" actions on Results/Workflow pages.
+              If you need a different run/artifact for the final image, open submission from that source.
+            </div>
+            {% endif %}
+          </div>
+          {% if form.neb_final_source_run_id.errors or form.neb_final_source_artifact_id.errors %}
+          <div style="color:#b91c1c;margin-top:8px;">
+            {{ form.neb_final_source_run_id.errors|join:", " }} {{ form.neb_final_source_artifact_id.errors|join:", " }}
+          </div>
+          {% endif %}
+        </div>
+
+        <div id="neb-final-bond-break-panel" style="display:none;margin-top:8px;">
+          <div class="muted" style="padding:8px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;">
+            Generate final image from the initial image by setting bond A-B to a target distance, then optionally optimise and validate bond absence.
+          </div>
+          <div class="grid" style="margin-top:8px;">
+            <div>
+              <label>Bond Atom A (0-based)</label><br />
+              {{ form.neb_break_bond_i }}
+              <div class="muted">{{ form.neb_break_bond_i.help_text }}</div>
+              {% if form.neb_break_bond_i.errors %}<div style="color:#b91c1c;">{{ form.neb_break_bond_i.errors|join:", " }}</div>{% endif %}
+            </div>
+            <div>
+              <label>Bond Atom B (0-based)</label><br />
+              {{ form.neb_break_bond_j }}
+              <div class="muted">{{ form.neb_break_bond_j.help_text }}</div>
+              {% if form.neb_break_bond_j.errors %}<div style="color:#b91c1c;">{{ form.neb_break_bond_j.errors|join:", " }}</div>{% endif %}
+            </div>
+            <div>
+              <label>Set Bond Distance (A)</label><br />
+              {{ form.neb_break_bond_extension_A }}
+              <div class="muted">{{ form.neb_break_bond_extension_A.help_text }}</div>
+              {% if form.neb_break_bond_extension_A.errors %}<div style="color:#b91c1c;">{{ form.neb_break_bond_extension_A.errors|join:", " }}</div>{% endif %}
+            </div>
+            <div>
+              <label>set_distance Fix</label><br />
+              {{ form.neb_break_bond_fix }}
+              <div class="muted">{{ form.neb_break_bond_fix.help_text }}</div>
+              {% if form.neb_break_bond_fix.errors %}<div style="color:#b91c1c;">{{ form.neb_break_bond_fix.errors|join:", " }}</div>{% endif %}
+            </div>
+            <div>
+              <label>Assert Bond Broken</label><br />
+              {{ form.neb_break_assert_broken }}
+              <div class="muted">{{ form.neb_break_assert_broken.help_text }}</div>
+              {% if form.neb_break_assert_broken.errors %}<div style="color:#b91c1c;">{{ form.neb_break_assert_broken.errors|join:", " }}</div>{% endif %}
+            </div>
+            <div>
+              <label>Bond Cutoff Scale</label><br />
+              {{ form.neb_break_cutoff_scale }}
+              <div class="muted">{{ form.neb_break_cutoff_scale.help_text }}</div>
+              {% if form.neb_break_cutoff_scale.errors %}<div style="color:#b91c1c;">{{ form.neb_break_cutoff_scale.errors|join:", " }}</div>{% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="coadsorbate-cluster-panel" style="display:none;margin-top:10px;padding:10px;border:1px solid #cbd5e1;border-radius:8px;background:#ffffff;">
+        <label>Reference Cluster</label><br />
+        {{ form.coadsorbate_reference_cluster }}
+        <div class="muted">{{ form.coadsorbate_reference_cluster.help_text }}</div>
+        {% if form.coadsorbate_reference_cluster.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_reference_cluster.errors|join:", " }}</div>{% endif %}
+      </div>
+
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button type="button" id="preview-structure-btn">Preview in Browser</button>
+        <button type="button" id="open-ase-gui-btn">Open in ASE GUI</button>
+      </div>
+      <div class="muted" id="structure-tool-status" style="margin-top:8px;"></div>
+
+      <div id="structure-preview-panel" style="display:none;margin-top:12px;padding:10px;border:1px solid #cbd5e1;border-radius:8px;background:#ffffff;">
+        <h4 style="margin:0 0 8px 0;">Structure Preview</h4>
+        <div id="structure-preview-meta" class="muted"></div>
+        <div id="structure-preview-elements" style="margin-top:6px;"></div>
+        <div style="max-height:220px;overflow:auto;margin-top:8px;border:1px solid #e2e8f0;border-radius:6px;">
+          <table style="width:100%;border-collapse:collapse;">
+            <thead>
+              <tr style="background:#f8fafc;">
+                <th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0;">Idx</th>
+                <th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0;">El</th>
+                <th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0;">x</th>
+                <th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0;">y</th>
+                <th style="text-align:left;padding:6px;border-bottom:1px solid #e2e8f0;">z</th>
+              </tr>
+            </thead>
+            <tbody id="structure-preview-rows"></tbody>
+          </table>
+        </div>
+        <label style="display:block;margin-top:8px;">XYZ Preview</label>
+        <pre id="structure-preview-xyz" style="max-height:220px;overflow:auto;background:#f8fafc;padding:8px;border-radius:6px;border:1px solid #e2e8f0;"></pre>
+      </div>
+    </div>
+
+    <div class="card" style="background:#f8fafc;" id="workflow-controls-card">
+      <h4 style="margin-top:0;">Workflow Controls</h4>
+      <div id="fmax-control-wrap" style="margin-bottom:10px;">
+        <label>fmax</label><br />
+        {{ form.fmax }}
+        <div class="muted">{{ form.fmax.help_text }}</div>
+        {% if form.fmax.errors %}<div style="color:#b91c1c;">{{ form.fmax.errors|join:", " }}</div>{% endif %}
+      </div>
+      <div id="optimizer-control-wrap" style="margin-bottom:10px;">
+        <label>Active-learning Optimiser</label><br />
+        {{ form.active_learning_optimizer }}
+        <div class="muted">{{ form.active_learning_optimizer.help_text }}</div>
+        {% if form.active_learning_optimizer.errors %}<div style="color:#b91c1c;">{{ form.active_learning_optimizer.errors|join:", " }}</div>{% endif %}
+      </div>
+      <div id="spin-control-wrap" style="margin-bottom:10px;">
+        <label>Spin Multiplicity</label><br />
+        {{ form.spin_multiplicity }}
+        <div class="muted">{{ form.spin_multiplicity.help_text }}</div>
+        {% if form.spin_multiplicity.errors %}<div style="color:#b91c1c;">{{ form.spin_multiplicity.errors|join:", " }}</div>{% endif %}
+      </div>
+
+      <div id="single-mode-panel" class="muted" style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;background:#ffffff;">
+        Single optimisation mode runs one optimisation only.
+        Optional optimisation constraints are available below (fixed symbols and optional constrained bond).
+        <div class="grid" style="margin-top:10px;">
+          <div>
+            <label>Final TDDFT Spectrum</label><br />
+            {{ form.single_final_tddft_spectrum }}
+            <div class="muted">{{ form.single_final_tddft_spectrum.help_text }}</div>
+            {% if form.single_final_tddft_spectrum.errors %}<div style="color:#b91c1c;">{{ form.single_final_tddft_spectrum.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Cluster Difference Spectrum</label><br />
+            {{ form.single_cluster_tddft_difference_spectrum }}
+            <div class="muted">{{ form.single_cluster_tddft_difference_spectrum.help_text }}</div>
+            {% if form.single_cluster_tddft_difference_spectrum.errors %}<div style="color:#b91c1c;">{{ form.single_cluster_tddft_difference_spectrum.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Charge-Transfer Spectrum</label><br />
+            {{ form.single_charge_transfer_spectrum }}
+            <div class="muted">{{ form.single_charge_transfer_spectrum.help_text }}</div>
+            {% if form.single_charge_transfer_spectrum.errors %}<div style="color:#b91c1c;">{{ form.single_charge_transfer_spectrum.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Final TDDFT NRoots Mode</label><br />
+            {{ form.single_final_tddft_nroots_mode }}
+            <div class="muted">{{ form.single_final_tddft_nroots_mode.help_text }}</div>
+            {% if form.single_final_tddft_nroots_mode.errors %}<div style="color:#b91c1c;">{{ form.single_final_tddft_nroots_mode.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div id="single-final-tddft-nroots-wrap">
+            <label>Final TDDFT NRoots</label><br />
+            {{ form.single_final_tddft_nroots }}
+            <div class="muted">{{ form.single_final_tddft_nroots.help_text }}</div>
+            {% if form.single_final_tddft_nroots.errors %}<div style="color:#b91c1c;">{{ form.single_final_tddft_nroots.errors|join:", " }}</div>{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div id="ct-mode-panel" style="display:none;padding:12px;border:1px solid #bfdbfe;border-radius:8px;background:#eff6ff;">
+        <div id="ct-standalone-note" style="color:#1e3a8a;margin-bottom:10px;">
+          Multiwfn will analyse the ORCA output from the selected source run. Enter ASE/Python
+          0-based indices here; the submitted job converts them to Multiwfn's 1-based indices
+          and retains the parsed CT data for later replotting.
+        </div>
+        <div id="ct-combined-note" style="display:none;color:#1e3a8a;margin-bottom:10px;">
+          After optimisation and final TDDFT, Multiwfn will analyse that calculation's retained
+          ORCA wavefunction in the same job. Enter ASE/Python 0-based fragment indices; they are
+          converted to Multiwfn's 1-based indices automatically. The CT state count follows
+          Final TDDFT NRoots above.
+        </div>
+        <div class="grid">
+          <div>
+            <label>Nanoparticle Fragment (0-based)</label><br />
+            {{ form.ct_nanoparticle_indices }}
+            <div class="muted">{{ form.ct_nanoparticle_indices.help_text }}</div>
+            {% if form.ct_nanoparticle_indices.errors %}<div style="color:#b91c1c;">{{ form.ct_nanoparticle_indices.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Adsorbate Fragment (0-based)</label><br />
+            {{ form.ct_adsorbate_indices }}
+            <div class="muted">{{ form.ct_adsorbate_indices.help_text }}</div>
+            {% if form.ct_adsorbate_indices.errors %}<div style="color:#b91c1c;">{{ form.ct_adsorbate_indices.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div id="ct-nroots-wrap">
+            <label>CT Spectrum NRoots</label><br />
+            {{ form.ct_nroots }}
+            <div class="muted">{{ form.ct_nroots.help_text }}</div>
+            {% if form.ct_nroots.errors %}<div style="color:#b91c1c;">{{ form.ct_nroots.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div id="ct-orca-basename-wrap">
+            <label>ORCA Basename</label><br />
+            {{ form.ct_orca_basename }}
+            <div class="muted">{{ form.ct_orca_basename.help_text }}</div>
+            {% if form.ct_orca_basename.errors %}<div style="color:#b91c1c;">{{ form.ct_orca_basename.errors|join:", " }}</div>{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div id="tddft-mode-panel" style="display:none;">
+        <div class="grid" style="margin-top:8px;">
+          <div>
+            <label>N Iter</label><br />
+            {{ form.n_iter }}
+            <div class="muted">{{ form.n_iter.help_text }}</div>
+            {% if form.n_iter.errors %}<div style="color:#b91c1c;">{{ form.n_iter.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Use TDDFT Optimisation</label><br />
+            {{ form.use_tddft_optimisation }}
+            <div class="muted">{{ form.use_tddft_optimisation.help_text }}</div>
+            {% if form.use_tddft_optimisation.errors %}<div style="color:#b91c1c;">{{ form.use_tddft_optimisation.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Target Wavelength (nm)</label><br />
+            {{ form.target_wavelength_nm }}
+            <div class="muted">{{ form.target_wavelength_nm.help_text }}</div>
+            {% if form.target_wavelength_nm.errors %}<div style="color:#b91c1c;">{{ form.target_wavelength_nm.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Target Wavelength Batch (nm)</label><br />
+            {{ form.target_wavelengths_nm }}
+            <div class="muted">{{ form.target_wavelengths_nm.help_text }}</div>
+            {% if form.target_wavelengths_nm.errors %}<div style="color:#b91c1c;">{{ form.target_wavelengths_nm.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>TDDFT Scan NRoots</label><br />
+            {{ form.tddft_scan_nroots }}
+            <div class="muted">{{ form.tddft_scan_nroots.help_text }}</div>
+            {% if form.tddft_scan_nroots.errors %}<div style="color:#b91c1c;">{{ form.tddft_scan_nroots.errors|join:", " }}</div>{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div id="neb-mode-panel" style="display:none;">
+        <div class="muted neb-mode-note" style="margin-top:8px;">
+          Active-learning NEB uses initial and final images, auto-selects image count from atom-shift density,
+          and can split a converged MEP around validated minima into chained climbing-image NEB segments.
+        </div>
+
+        <div class="neb-section" id="neb-backend-section">
+          <h5>Backend</h5>
+          <div class="grid">
+            <div>
+              <label>NEB Backend</label><br />
+              {{ form.neb_backend }}
+              <div class="muted">{{ form.neb_backend.help_text }}</div>
+              {% if form.neb_backend.errors %}<div style="color:#b91c1c;">{{ form.neb_backend.errors|join:", " }}</div>{% endif %}
+            </div>
+          </div>
+
+          <div id="neb-mace-settings-panel" class="grid" style="margin-top:8px;">
+            <div>
+              <label>MACE Model Path</label><br />
+              {{ form.neb_mace_model_path }}
+              <div class="muted">{{ form.neb_mace_model_path.help_text }}</div>
+              {% if form.neb_mace_model_path.errors %}<div style="color:#b91c1c;">{{ form.neb_mace_model_path.errors|join:", " }}</div>{% endif %}
+            </div>
+            <div>
+              <label>MACE Device</label><br />
+              {{ form.neb_mace_device }}
+              <div class="muted">{{ form.neb_mace_device.help_text }}</div>
+              {% if form.neb_mace_device.errors %}<div style="color:#b91c1c;">{{ form.neb_mace_device.errors|join:", " }}</div>{% endif %}
+            </div>
+            <div>
+              <label>MACE Dtype</label><br />
+              {{ form.neb_mace_default_dtype }}
+              <div class="muted">{{ form.neb_mace_default_dtype.help_text }}</div>
+              {% if form.neb_mace_default_dtype.errors %}<div style="color:#b91c1c;">{{ form.neb_mace_default_dtype.errors|join:", " }}</div>{% endif %}
+            </div>
+            <div>
+              <label>MACE Dispersion</label><br />
+              {{ form.neb_mace_dispersion }}
+              <div class="muted">{{ form.neb_mace_dispersion.help_text }}</div>
+              {% if form.neb_mace_dispersion.errors %}<div style="color:#b91c1c;">{{ form.neb_mace_dispersion.errors|join:", " }}</div>{% endif %}
+            </div>
+          </div>
+
+          <div id="neb-tddft-settings-panel" style="display:none;margin-top:8px;">
+            <div class="muted neb-mode-note">
+              TDDFT MLNEB uses the selected settings profile for basis, functional, and solvent.
+              State following uses the previous image in the current band.
+            </div>
+          </div>
+          <div id="neb-dft-settings-panel" style="display:none;margin-top:8px;">
+            <div class="muted neb-mode-note">
+              DFT NEB uses regular ORCA DFT engrad calculations with the selected settings profile.
+            </div>
+          </div>
+        </div>
+
+        <div class="neb-section" id="neb-endpoint-opt-section">
+          <h5>Endpoint Preparation</h5>
+          <div class="grid">
+          <div>
+            <label>Optimise Initial Endpoint</label><br />
+            {{ form.neb_optimize_initial_image }}
+            <div class="muted">{{ form.neb_optimize_initial_image.help_text }}</div>
+            {% if form.neb_optimize_initial_image.errors %}<div style="color:#b91c1c;">{{ form.neb_optimize_initial_image.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Optimise Final Endpoint</label><br />
+            {{ form.neb_optimize_final_image }}
+            <div class="muted">{{ form.neb_optimize_final_image.help_text }}</div>
+            {% if form.neb_optimize_final_image.errors %}<div style="color:#b91c1c;">{{ form.neb_optimize_final_image.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Endpoint Opt Steps</label><br />
+            {{ form.neb_endpoint_opt_steps }}
+            <div class="muted">{{ form.neb_endpoint_opt_steps.help_text }}</div>
+            {% if form.neb_endpoint_opt_steps.errors %}<div style="color:#b91c1c;">{{ form.neb_endpoint_opt_steps.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Endpoint Opt fmax</label><br />
+            {{ form.neb_endpoint_opt_fmax }}
+            <div class="muted">{{ form.neb_endpoint_opt_fmax.help_text }}</div>
+            {% if form.neb_endpoint_opt_fmax.errors %}<div style="color:#b91c1c;">{{ form.neb_endpoint_opt_fmax.errors|join:", " }}</div>{% endif %}
+          </div>
+        </div>
+        </div>
+
+        <div class="neb-section" id="neb-path-section">
+          <h5>NEB Path</h5>
+          <div class="grid">
+          <div>
+            <label>Atom Shift / Image (A)</label><br />
+            {{ form.neb_atom_shift_per_image_A }}
+            <div class="muted">{{ form.neb_atom_shift_per_image_A.help_text }}</div>
+            {% if form.neb_atom_shift_per_image_A.errors %}<div style="color:#b91c1c;">{{ form.neb_atom_shift_per_image_A.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Min Images</label><br />
+            {{ form.neb_min_images }}
+            <div class="muted">{{ form.neb_min_images.help_text }}</div>
+            {% if form.neb_min_images.errors %}<div style="color:#b91c1c;">{{ form.neb_min_images.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Max Images</label><br />
+            {{ form.neb_max_images }}
+            <div class="muted">{{ form.neb_max_images.help_text }}</div>
+            {% if form.neb_max_images.errors %}<div style="color:#b91c1c;">{{ form.neb_max_images.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Spring Constant</label><br />
+            {{ form.neb_spring_constant }}
+            <div class="muted">{{ form.neb_spring_constant.help_text }}</div>
+            {% if form.neb_spring_constant.errors %}<div style="color:#b91c1c;">{{ form.neb_spring_constant.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Max NEB Steps</label><br />
+            {{ form.neb_max_steps }}
+            <div class="muted">{{ form.neb_max_steps.help_text }}</div>
+            {% if form.neb_max_steps.errors %}<div style="color:#b91c1c;">{{ form.neb_max_steps.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Climbing Image</label><br />
+            {{ form.neb_climb }}
+            <div class="muted">{{ form.neb_climb.help_text }}</div>
+            {% if form.neb_climb.errors %}<div style="color:#b91c1c;">{{ form.neb_climb.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Split on Minimum</label><br />
+            {{ form.neb_split_on_minimum }}
+            <div class="muted">{{ form.neb_split_on_minimum.help_text }}</div>
+            {% if form.neb_split_on_minimum.errors %}<div style="color:#b91c1c;">{{ form.neb_split_on_minimum.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Minimum Energy Window (eV)</label><br />
+            {{ form.neb_minimum_energy_window_eV }}
+            <div class="muted">{{ form.neb_minimum_energy_window_eV.help_text }}</div>
+            {% if form.neb_minimum_energy_window_eV.errors %}<div style="color:#b91c1c;">{{ form.neb_minimum_energy_window_eV.errors|join:", " }}</div>{% endif %}
+          </div>
+        </div>
+        </div>
+
+        <div class="neb-section" id="neb-catlearn-section">
+          <h5>CatLearn</h5>
+          <div class="grid">
+          <div>
+            <label>CatLearn Min Data</label><br />
+            {{ form.neb_catlearn_min_data }}
+            <div class="muted">{{ form.neb_catlearn_min_data.help_text }}</div>
+            {% if form.neb_catlearn_min_data.errors %}<div style="color:#b91c1c;">{{ form.neb_catlearn_min_data.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>CatLearn Unc Convergence</label><br />
+            {{ form.neb_catlearn_unc_convergence }}
+            <div class="muted">{{ form.neb_catlearn_unc_convergence.help_text }}</div>
+            {% if form.neb_catlearn_unc_convergence.errors %}<div style="color:#b91c1c;">{{ form.neb_catlearn_unc_convergence.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>CatLearn Max Unc</label><br />
+            {{ form.neb_catlearn_max_unc }}
+            <div class="muted">{{ form.neb_catlearn_max_unc.help_text }}</div>
+            {% if form.neb_catlearn_max_unc.errors %}<div style="color:#b91c1c;">{{ form.neb_catlearn_max_unc.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>CatLearn Steps</label><br />
+            {{ form.neb_catlearn_steps }}
+            <div class="muted">{{ form.neb_catlearn_steps.help_text }}</div>
+            {% if form.neb_catlearn_steps.errors %}<div style="color:#b91c1c;">{{ form.neb_catlearn_steps.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>CatLearn ML Steps</label><br />
+            {{ form.neb_catlearn_ml_steps }}
+            <div class="muted">{{ form.neb_catlearn_ml_steps.help_text }}</div>
+            {% if form.neb_catlearn_ml_steps.errors %}<div style="color:#b91c1c;">{{ form.neb_catlearn_ml_steps.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>CatLearn dtrust</label><br />
+            {{ form.neb_catlearn_dtrust }}
+            <div class="muted">{{ form.neb_catlearn_dtrust.help_text }}</div>
+            {% if form.neb_catlearn_dtrust.errors %}<div style="color:#b91c1c;">{{ form.neb_catlearn_dtrust.errors|join:", " }}</div>{% endif %}
+          </div>
+        </div>
+        </div>
+
+        <div class="neb-section" id="neb-preflight-panel">
+          <h5>Preflight</h5>
+          <div id="neb-preflight-summary" class="muted"></div>
+        </div>
+      </div>
+
+      <div id="coadsorbate-mode-panel" style="display:none;">
+        <div class="grid" style="margin-top:8px;">
+          <div>
+            <label>Placement Mode</label><br />
+            {{ form.coadsorbate_placement_mode }}
+            <div class="muted">{{ form.coadsorbate_placement_mode.help_text }}</div>
+            {% if form.coadsorbate_placement_mode.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_placement_mode.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Reference Adsorbates</label><br />
+            {{ form.coadsorbate_reference_adsorbates }}
+            <div class="muted">{{ form.coadsorbate_reference_adsorbates.help_text }}</div>
+            {% if form.coadsorbate_reference_adsorbates.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_reference_adsorbates.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>ASE Adsorbates</label><br />
+            {{ form.coadsorbate_ase_molecules }}
+            <div class="muted">{{ form.coadsorbate_ase_molecules.help_text }}</div>
+            {% if form.coadsorbate_ase_molecules.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_ase_molecules.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>PubChem CIDs</label><br />
+            {{ form.coadsorbate_pubchem_cids }}
+            <div class="muted">{{ form.coadsorbate_pubchem_cids.help_text }}</div>
+            {% if form.coadsorbate_pubchem_cids.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_pubchem_cids.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>PubChem Queries</label><br />
+            {{ form.coadsorbate_pubchem_queries }}
+            <div class="muted">{{ form.coadsorbate_pubchem_queries.help_text }}</div>
+            {% if form.coadsorbate_pubchem_queries.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_pubchem_queries.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Adsorbate Structure Files</label><br />
+            {{ form.coadsorbate_structure_files }}
+            <div class="muted">{{ form.coadsorbate_structure_files.help_text }}</div>
+            {% if form.coadsorbate_structure_files.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_structure_files.errors|join:", " }}</div>{% endif %}
+          </div>
+        </div>
+
+        <div class="grid" style="margin-top:8px;">
+          <div>
+            <label>MACE Model Path</label><br />
+            {{ form.coadsorbate_mace_model_path }}
+            <div class="muted">{{ form.coadsorbate_mace_model_path.help_text }}</div>
+            {% if form.coadsorbate_mace_model_path.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_mace_model_path.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>MACE Device</label><br />
+            {{ form.coadsorbate_mace_device }}
+            <div class="muted">{{ form.coadsorbate_mace_device.help_text }}</div>
+            {% if form.coadsorbate_mace_device.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_mace_device.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>MACE fmax</label><br />
+            {{ form.coadsorbate_mace_fmax }}
+            <div class="muted">{{ form.coadsorbate_mace_fmax.help_text }}</div>
+            {% if form.coadsorbate_mace_fmax.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_mace_fmax.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>MACE Max Steps</label><br />
+            {{ form.coadsorbate_mace_max_steps }}
+            <div class="muted">{{ form.coadsorbate_mace_max_steps.help_text }}</div>
+            {% if form.coadsorbate_mace_max_steps.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_mace_max_steps.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>{{ form.coadsorbate_mace_dispersion }} MACE Dispersion</label>
+            <div class="muted">{{ form.coadsorbate_mace_dispersion.help_text }}</div>
+            {% if form.coadsorbate_mace_dispersion.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_mace_dispersion.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>{{ form.coadsorbate_mace_enable_cueq }} MACE cuEquivariance</label>
+            <div class="muted">{{ form.coadsorbate_mace_enable_cueq.help_text }}</div>
+            {% if form.coadsorbate_mace_enable_cueq.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_mace_enable_cueq.errors|join:", " }}</div>{% endif %}
+          </div>
+        </div>
+
+        <div class="grid" style="margin-top:8px;">
+          <div style="grid-column: 1 / -1;">
+            <div class="muted">
+              Symbol fields below are auto-populated from structure analysis when geometry is chosen/uploaded.
+              You can still edit them manually.
+            </div>
+          </div>
+          <div>
+            <label>Generation Site Symbols</label><br />
+            {{ form.coadsorbate_site_symbols }}
+            <div class="muted">{{ form.coadsorbate_site_symbols.help_text }}</div>
+            {% if form.coadsorbate_site_symbols.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_site_symbols.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Generation Passive Symbols</label><br />
+            {{ form.coadsorbate_passive_symbols }}
+            <div class="muted">{{ form.coadsorbate_passive_symbols.help_text }}</div>
+            {% if form.coadsorbate_passive_symbols.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_passive_symbols.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Generation Height (A)</label><br />
+            {{ form.coadsorbate_height }}
+            <div class="muted">{{ form.coadsorbate_height.help_text }}</div>
+            {% if form.coadsorbate_height.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_height.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Generation Slab z Cutoff (absolute z, A, periodic only)</label><br />
+            {{ form.coadsorbate_generation_z_cutoff }}
+            <div class="muted">{{ form.coadsorbate_generation_z_cutoff.help_text }}</div>
+            {% if form.coadsorbate_generation_z_cutoff.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_generation_z_cutoff.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>{{ form.coadsorbate_include_below_surface }} Place on both sides of carbon layer</label>
+            <div class="muted">{{ form.coadsorbate_include_below_surface.help_text }}</div>
+            {% if form.coadsorbate_include_below_surface.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_include_below_surface.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Active-Site Origin Atom (0-based index)</label><br />
+            {{ form.coadsorbate_origin_atom_index }}
+            <div class="muted">{{ form.coadsorbate_origin_atom_index.help_text }}</div>
+            {% if form.coadsorbate_origin_atom_index.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_origin_atom_index.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Active-Site Cutoff (A)</label><br />
+            {{ form.coadsorbate_site_cutoff }}
+            <div class="muted">{{ form.coadsorbate_site_cutoff.help_text }}</div>
+            {% if form.coadsorbate_site_cutoff.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_site_cutoff.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Support Relaxation Neighbour Shells</label><br />
+            {{ form.coadsorbate_relaxation_neighbor_shells }}
+            <div class="muted">{{ form.coadsorbate_relaxation_neighbor_shells.help_text }}</div>
+            {% if form.coadsorbate_relaxation_neighbor_shells.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_relaxation_neighbor_shells.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Silicate Origin Atom</label><br />
+            {{ form.coadsorbate_silicate_origin_atom_index }}
+            <div class="muted">{{ form.coadsorbate_silicate_origin_atom_index.help_text }}</div>
+            {% if form.coadsorbate_silicate_origin_atom_index.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_silicate_origin_atom_index.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Silicate O Triangle Indices</label><br />
+            {{ form.coadsorbate_silicate_pore_triangle_indices }}
+            <div class="muted">{{ form.coadsorbate_silicate_pore_triangle_indices.help_text }}</div>
+            {% if form.coadsorbate_silicate_pore_triangle_indices.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_silicate_pore_triangle_indices.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Silicate Site Atom Indices</label><br />
+            {{ form.coadsorbate_silicate_site_atom_indices }}
+            <div class="muted">{{ form.coadsorbate_silicate_site_atom_indices.help_text }}</div>
+            {% if form.coadsorbate_silicate_site_atom_indices.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_silicate_site_atom_indices.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Silicate Heights (A)</label><br />
+            {{ form.coadsorbate_silicate_heights }}
+            <div class="muted">{{ form.coadsorbate_silicate_heights.help_text }}</div>
+            {% if form.coadsorbate_silicate_heights.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_silicate_heights.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Silicate Rotation Step (deg)</label><br />
+            {{ form.coadsorbate_silicate_rotation_step_degrees }}
+            <div class="muted">{{ form.coadsorbate_silicate_rotation_step_degrees.help_text }}</div>
+            {% if form.coadsorbate_silicate_rotation_step_degrees.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_silicate_rotation_step_degrees.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Silicate Clash Scale</label><br />
+            {{ form.coadsorbate_silicate_clash_scale }}
+            <div class="muted">{{ form.coadsorbate_silicate_clash_scale.help_text }}</div>
+            {% if form.coadsorbate_silicate_clash_scale.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_silicate_clash_scale.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Silicate Push Step (A)</label><br />
+            {{ form.coadsorbate_silicate_push_step }}
+            <div class="muted">{{ form.coadsorbate_silicate_push_step.help_text }}</div>
+            {% if form.coadsorbate_silicate_push_step.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_silicate_push_step.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Silicate Max Push Steps</label><br />
+            {{ form.coadsorbate_silicate_max_push_steps }}
+            <div class="muted">{{ form.coadsorbate_silicate_max_push_steps.help_text }}</div>
+            {% if form.coadsorbate_silicate_max_push_steps.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_silicate_max_push_steps.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>{{ form.coadsorbate_keep_bound_only }} Keep bound only</label>
+            <div class="muted">{{ form.coadsorbate_keep_bound_only.help_text }}</div>
+            {% if form.coadsorbate_keep_bound_only.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_keep_bound_only.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Similarity Slab Shave Distance (depth from top support z, A, periodic only)</label><br />
+            {{ form.coadsorbate_similarity_slab_shave_distance }}
+            <div class="muted">{{ form.coadsorbate_similarity_slab_shave_distance.help_text }}</div>
+            {% if form.coadsorbate_similarity_slab_shave_distance.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_similarity_slab_shave_distance.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Similarity Support Species</label><br />
+            {{ form.coadsorbate_support_species }}
+            <div class="muted">{{ form.coadsorbate_support_species.help_text }}</div>
+            {% if form.coadsorbate_support_species.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_support_species.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Site Probe Element</label><br />
+            {{ form.coadsorbate_site_probe_symbol }}
+            <div class="muted">{{ form.coadsorbate_site_probe_symbol.help_text }}</div>
+            {% if form.coadsorbate_site_probe_symbol.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_site_probe_symbol.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Site Probe Similarity Cutoff</label><br />
+            {{ form.coadsorbate_site_probe_similarity_cutoff }}
+            <div class="muted">{{ form.coadsorbate_site_probe_similarity_cutoff.help_text }}</div>
+            {% if form.coadsorbate_site_probe_similarity_cutoff.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_site_probe_similarity_cutoff.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Single-Mode Duplicate Cutoff</label><br />
+            {{ form.coadsorbate_single_mode_duplicate_cutoff }}
+            <div class="muted">{{ form.coadsorbate_single_mode_duplicate_cutoff.help_text }}</div>
+            {% if form.coadsorbate_single_mode_duplicate_cutoff.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_single_mode_duplicate_cutoff.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Combined-Candidate Duplicate Cutoff</label><br />
+            {{ form.coadsorbate_candidate_duplicate_cutoff }}
+            <div class="muted">{{ form.coadsorbate_candidate_duplicate_cutoff.help_text }}</div>
+            {% if form.coadsorbate_candidate_duplicate_cutoff.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_candidate_duplicate_cutoff.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Relaxed-Minimum Duplicate Cutoff</label><br />
+            {{ form.coadsorbate_relaxed_minimum_duplicate_cutoff }}
+            <div class="muted">{{ form.coadsorbate_relaxed_minimum_duplicate_cutoff.help_text }}</div>
+            {% if form.coadsorbate_relaxed_minimum_duplicate_cutoff.errors %}<div style="color:#b91c1c;">{{ form.coadsorbate_relaxed_minimum_duplicate_cutoff.errors|join:", " }}</div>{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div id="constraint-controls-panel" style="display:none;margin-top:10px;padding:10px;border:1px solid #e2e8f0;border-radius:8px;background:#ffffff;">
+        <strong id="constraint-controls-title">Optimisation Constraints</strong>
+        <div class="grid" style="margin-top:8px;">
+          <div>
+            <label>Bond Index i</label><br />
+            {{ form.bond_i }}
+            <div class="muted">{{ form.bond_i.help_text }}</div>
+            {% if form.bond_i.errors %}<div style="color:#b91c1c;">{{ form.bond_i.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Bond Index j</label><br />
+            {{ form.bond_j }}
+            <div class="muted">{{ form.bond_j.help_text }}</div>
+            {% if form.bond_j.errors %}<div style="color:#b91c1c;">{{ form.bond_j.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Increment (A)</label><br />
+            {{ form.increment }}
+            <div class="muted">{{ form.increment.help_text }}</div>
+            {% if form.increment.errors %}<div style="color:#b91c1c;">{{ form.increment.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Fix</label><br />
+            {{ form.fix }}
+            <div class="muted">{{ form.fix.help_text }}</div>
+            {% if form.fix.errors %}<div style="color:#b91c1c;">{{ form.fix.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Target Distance (A)</label><br />
+            {{ form.target_distance }}
+            <div class="muted">{{ form.target_distance.help_text }}</div>
+            {% if form.target_distance.errors %}<div style="color:#b91c1c;">{{ form.target_distance.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Distance Change Fraction</label><br />
+            {{ form.distance_change_fraction }}
+            <div class="muted">{{ form.distance_change_fraction.help_text }}</div>
+            {% if form.distance_change_fraction.errors %}<div style="color:#b91c1c;">{{ form.distance_change_fraction.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Enable TS Smoothing</label><br />
+            {{ form.enable_ts_smoothing }}
+            <div class="muted">{{ form.enable_ts_smoothing.help_text }}</div>
+            {% if form.enable_ts_smoothing.errors %}<div style="color:#b91c1c;">{{ form.enable_ts_smoothing.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Refinement Points / Side</label><br />
+            {{ form.refine_points_each_side }}
+            <div class="muted">{{ form.refine_points_each_side.help_text }}</div>
+            {% if form.refine_points_each_side.errors %}<div style="color:#b91c1c;">{{ form.refine_points_each_side.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Restart Extension Steps</label><br />
+            {{ form.restart_extend_steps }}
+            <div class="muted">{{ form.restart_extend_steps.help_text }}</div>
+            {% if form.restart_extend_steps.errors %}<div style="color:#b91c1c;">{{ form.restart_extend_steps.errors|join:", " }}</div>{% endif %}
+          </div>
+          <div>
+            <label>Restart Extension Increment (A)</label><br />
+            {{ form.restart_extend_increment_A }}
+            <div class="muted">{{ form.restart_extend_increment_A.help_text }}</div>
+            {% if form.restart_extend_increment_A.errors %}<div style="color:#b91c1c;">{{ form.restart_extend_increment_A.errors|join:", " }}</div>{% endif %}
+          </div>
+        </div>
+        <div style="margin-top:10px;">
+          <label>Fixed Symbols</label><br />
+          {{ form.fixed_symbols }}
+          <div class="muted">{{ form.fixed_symbols.help_text }}</div>
+          {% if form.fixed_symbols.errors %}<div style="color:#b91c1c;">{{ form.fixed_symbols.errors|join:", " }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="background:#f8fafc;">
+      <h4 style="margin-top:0;">Slurm Resources</h4>
+      <div style="margin-bottom:10px;">
+        <label>Slurm Preset</label><br />
+        {{ form.slurm_preset }}
+        <div class="muted">{{ form.slurm_preset.help_text }}</div>
+        {% if form.slurm_preset.errors %}<div style="color:#b91c1c;">{{ form.slurm_preset.errors|join:", " }}</div>{% endif %}
+      </div>
+      <div class="grid">
+        <div><label>Nodes</label><br />{{ form.nodes }}{% if form.nodes.errors %}<div style="color:#b91c1c;">{{ form.nodes.errors|join:", " }}</div>{% endif %}</div>
+        <div><label>Tasks Per Node</label><br />{{ form.tasks_per_node }}{% if form.tasks_per_node.errors %}<div style="color:#b91c1c;">{{ form.tasks_per_node.errors|join:", " }}</div>{% endif %}</div>
+        <div><label>CPUs Per Task</label><br />{{ form.cpus_per_task }}{% if form.cpus_per_task.errors %}<div style="color:#b91c1c;">{{ form.cpus_per_task.errors|join:", " }}</div>{% endif %}</div>
+        <div><label>Walltime</label><br />{{ form.walltime }}{% if form.walltime.errors %}<div style="color:#b91c1c;">{{ form.walltime.errors|join:", " }}</div>{% endif %}</div>
+        <div><label>Account</label><br />{{ form.account }}{% if form.account.errors %}<div style="color:#b91c1c;">{{ form.account.errors|join:", " }}</div>{% endif %}</div>
+        <div><label>Partition</label><br />{{ form.partition }}{% if form.partition.errors %}<div style="color:#b91c1c;">{{ form.partition.errors|join:", " }}</div>{% endif %}</div>
+        <div><label>QoS</label><br />{{ form.qos }}{% if form.qos.errors %}<div style="color:#b91c1c;">{{ form.qos.errors|join:", " }}</div>{% endif %}</div>
+        <div><label>Reservation</label><br />{{ form.reservation }}{% if form.reservation.errors %}<div style="color:#b91c1c;">{{ form.reservation.errors|join:", " }}</div>{% endif %}</div>
+      </div>
+    </div>
+
+    <div class="card" style="background:#f8fafc;">
+      <h4 style="margin-top:0;">HPC Paths and Environment</h4>
+      <div class="grid">
+        <div>
+          <label>Remote Runs Root</label><br />
+          {{ form.remote_runs_root }}
+          {% if form.remote_runs_root.errors %}<div style="color:#b91c1c;">{{ form.remote_runs_root.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div>
+          <label>Scratch Base</label><br />
+          {{ form.scratch_base }}
+          {% if form.scratch_base.errors %}<div style="color:#b91c1c;">{{ form.scratch_base.errors|join:", " }}</div>{% endif %}
+        </div>
+        <div>
+          <label>Venv Activate Path</label><br />
+          {{ form.venv_activate_path }}
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <label>Module Loads</label><br />
+        {{ form.module_loads }}
+        <div class="muted">{{ form.module_loads.help_text }}</div>
+        {% if form.module_loads.errors %}<div style="color:#b91c1c;">{{ form.module_loads.errors|join:", " }}</div>{% endif %}
+      </div>
+      <div style="margin-top:10px;">
+        <label>PYTHONPATH Entries</label><br />
+        {{ form.pythonpath_entries }}
+        <div class="muted">{{ form.pythonpath_entries.help_text }}</div>
+        {% if form.pythonpath_entries.errors %}<div style="color:#b91c1c;">{{ form.pythonpath_entries.errors|join:", " }}</div>{% endif %}
+      </div>
+    </div>
+
+    {% if form.errors %}
+    <div style="background:#fee2e2;border:1px solid #ef4444;padding:10px;border-radius:6px;margin-bottom:10px;color:#991b1b;">
+      <strong>Submission is blocked by form errors above.</strong>
+    </div>
+    {% endif %}
+    <button type="submit">Submit to HPC</button>
+  </form>
+</div>
+<script>
+(() => {
+  const mapping = {{ hpc_prefill_json|safe }};
+  const slurmPresetsMap = {{ slurm_presets_json|safe }};
+  const tddftDefaults = {{ tddft_slurm_defaults_json|safe }};
+  const settingsProfileBackendMap = {{ settings_profile_backend_json|safe }};
+  const workflowModeMap = {{ workflow_mode_map_json|safe }};
+  const workflowPreferredByMode = {{ workflow_preferred_by_mode_json|safe }};
+
+  const hpcSelect = document.getElementById("id_hpc_system");
+  const runModeSelect = document.getElementById("id_run_mode");
+  const workflowSelect = document.getElementById("id_workflow");
+  const settingsProfileSelect = document.getElementById("id_settings_profile");
+  const geometrySourceSelect = document.getElementById("id_geometry_source");
+  const venvInput = document.getElementById("id_venv_activate_path");
+  const moduleLoadsInput = document.getElementById("id_module_loads");
+  const pythonpathInput = document.getElementById("id_pythonpath_entries");
+  const remoteRunsRootInput = document.getElementById("id_remote_runs_root");
+  const scratchBaseInput = document.getElementById("id_scratch_base");
+  const coadsorbateMaceModelInput = document.getElementById("id_coadsorbate_mace_model_path");
+  const nebMaceModelInput = document.getElementById("id_neb_mace_model_path");
+  const coadsorbateReferenceAdsorbatesInput = document.getElementById("id_coadsorbate_reference_adsorbates");
+  const coadsorbateSiteSymbolsInput = document.getElementById("id_coadsorbate_site_symbols");
+  const coadsorbatePassiveSymbolsInput = document.getElementById("id_coadsorbate_passive_symbols");
+  const coadsorbateSupportSpeciesInput = document.getElementById("id_coadsorbate_support_species");
+  const slurmPresetSelect = document.getElementById("id_slurm_preset");
+  const nodesInput = document.getElementById("id_nodes");
+  const tasksPerNodeInput = document.getElementById("id_tasks_per_node");
+  const cpusPerTaskInput = document.getElementById("id_cpus_per_task");
+  const accountInput = document.getElementById("id_account");
+  const partitionInput = document.getElementById("id_partition");
+  const qosInput = document.getElementById("id_qos");
+  const reservationInput = document.getElementById("id_reservation");
+  const walltimeInput = document.getElementById("id_walltime");
+  const referenceIntentSelect = document.getElementById("id_reference_intent");
+  const referenceIntentWrap = document.getElementById("reference-intent-wrap");
+  const referenceNameInput = document.getElementById("id_reference_name");
+  const referenceNameWrap = document.getElementById("reference-name-wrap");
+  const qmBackendWrap = document.getElementById("qm-backend-wrap");
+  const qmBackendInput = document.getElementById("id_qm_backend");
+  const fmaxControlWrap = document.getElementById("fmax-control-wrap");
+  const optimizerControlWrap = document.getElementById("optimizer-control-wrap");
+  const spinControlWrap = document.getElementById("spin-control-wrap");
+
+  const singleModePanel = document.getElementById("single-mode-panel");
+  const ctModePanel = document.getElementById("ct-mode-panel");
+  const tddftModePanel = document.getElementById("tddft-mode-panel");
+  const nebModePanel = document.getElementById("neb-mode-panel");
+  const coadsorbateModePanel = document.getElementById("coadsorbate-mode-panel");
+  const nebMaceSettingsPanel = document.getElementById("neb-mace-settings-panel");
+  const nebTddftSettingsPanel = document.getElementById("neb-tddft-settings-panel");
+  const nebDftSettingsPanel = document.getElementById("neb-dft-settings-panel");
+  const nebPreflightSummary = document.getElementById("neb-preflight-summary");
+  const constraintControlsPanel = document.getElementById("constraint-controls-panel");
+  const constraintControlsTitle = document.getElementById("constraint-controls-title");
+  const nebBackendInput = document.getElementById("id_neb_backend");
+  const nIterInput = document.getElementById("id_n_iter");
+  const useTddftOptimisationInput = document.getElementById("id_use_tddft_optimisation");
+  const targetWavelengthInput = document.getElementById("id_target_wavelength_nm");
+  const targetWavelengthBatchInput = document.getElementById("id_target_wavelengths_nm");
+  const tddftScanNrootsInput = document.getElementById("id_tddft_scan_nroots");
+  const singleFinalTddftSpectrumInput = document.getElementById("id_single_final_tddft_spectrum");
+  const singleChargeTransferSpectrumInput = document.getElementById("id_single_charge_transfer_spectrum");
+  const singleFinalTddftNrootsInput = document.getElementById("id_single_final_tddft_nroots");
+  const singleFinalTddftNrootsModeInput = document.getElementById("id_single_final_tddft_nroots_mode");
+  const ctNanoparticleIndicesInput = document.getElementById("id_ct_nanoparticle_indices");
+  const ctAdsorbateIndicesInput = document.getElementById("id_ct_adsorbate_indices");
+  const ctNrootsInput = document.getElementById("id_ct_nroots");
+  const bondIInput = document.getElementById("id_bond_i");
+  const bondJInput = document.getElementById("id_bond_j");
+  const incrementInput = document.getElementById("id_increment");
+  const fixInput = document.getElementById("id_fix");
+  const fixedSymbolsInput = document.getElementById("id_fixed_symbols");
+  const targetDistanceInput = document.getElementById("id_target_distance");
+  const distanceChangeFractionInput = document.getElementById("id_distance_change_fraction");
+  const enableTsSmoothingInput = document.getElementById("id_enable_ts_smoothing");
+  const refinePointsEachSideInput = document.getElementById("id_refine_points_each_side");
+  const restartExtendStepsInput = document.getElementById("id_restart_extend_steps");
+  const restartExtendIncrementInput = document.getElementById("id_restart_extend_increment_A");
+
+  const geometryUploadPanel = document.getElementById("geometry-upload-panel");
+  const geometryAsePanel = document.getElementById("geometry-ase-panel");
+  const geometryPubchemPanel = document.getElementById("geometry-pubchem-panel");
+  const geometryExistingPanel = document.getElementById("geometry-existing-panel");
+  const coadsorbateClusterPanel = document.getElementById("coadsorbate-cluster-panel");
+  const nebFinalImagePanel = document.getElementById("neb-final-image-panel");
+  const nebFinalImageStrategySelect = document.getElementById("id_neb_final_image_strategy");
+  const nebFinalExplicitPanel = document.getElementById("neb-final-explicit-panel");
+  const nebFinalBondBreakPanel = document.getElementById("neb-final-bond-break-panel");
+  const nebFinalGeometrySourceSelect = document.getElementById("id_neb_final_geometry_source");
+  const nebFinalUploadPanel = document.getElementById("neb-final-upload-panel");
+  const nebFinalAsePanel = document.getElementById("neb-final-ase-panel");
+  const nebFinalPubchemPanel = document.getElementById("neb-final-pubchem-panel");
+  const nebFinalExistingPanel = document.getElementById("neb-final-existing-panel");
+  const nebFinalStructureFileInput = document.getElementById("id_neb_final_structure_file");
+  const nebFinalTrajFrameInput = document.getElementById("id_neb_final_traj_frame");
+  const nebFinalAseFormulaInput = document.getElementById("id_neb_final_ase_molecule_formula");
+  const nebFinalPubchemCidInput = document.getElementById("id_neb_final_pubchem_cid");
+  const nebFinalPubchemQueryInput = document.getElementById("id_neb_final_pubchem_query");
+  const nebBreakBondIInput = document.getElementById("id_neb_break_bond_i");
+  const nebBreakBondJInput = document.getElementById("id_neb_break_bond_j");
+  const nebBreakBondExtensionInput = document.getElementById("id_neb_break_bond_extension_A");
+  const nebBreakBondFixInput = document.getElementById("id_neb_break_bond_fix");
+  const nebBreakAssertBrokenInput = document.getElementById("id_neb_break_assert_broken");
+  const nebBreakCutoffScaleInput = document.getElementById("id_neb_break_cutoff_scale");
+  const structureInput = document.getElementById("id_structure_file");
+  const trajFrameInput = document.getElementById("id_traj_frame");
+  const submitAllTrajInput = document.getElementById("id_submit_all_traj_frames");
+  const aseFormulaInput = document.getElementById("id_ase_molecule_formula");
+  const pubchemCidInput = document.getElementById("id_pubchem_cid");
+  const pubchemQueryInput = document.getElementById("id_pubchem_query");
+  const sourceRunIdInput = document.getElementById("id_source_run_id");
+  const sourceArtifactIdInput = document.getElementById("id_source_artifact_id");
+  const previewBtn = document.getElementById("preview-structure-btn");
+  const openAseBtn = document.getElementById("open-ase-gui-btn");
+  const statusEl = document.getElementById("structure-tool-status");
+
+  const previewPanel = document.getElementById("structure-preview-panel");
+  const previewMeta = document.getElementById("structure-preview-meta");
+  const previewElements = document.getElementById("structure-preview-elements");
+  const previewRows = document.getElementById("structure-preview-rows");
+  const previewXyz = document.getElementById("structure-preview-xyz");
+
+  const csrfInput = document.querySelector("input[name=csrfmiddlewaretoken]");
+  const csrfToken = csrfInput ? csrfInput.value : "";
+
+  const escapeHtml = (value) => {
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  };
+
+  const setStatus = (message, isError) => {
+    if (!statusEl) return;
+    statusEl.style.color = isError ? "#b91c1c" : "#0f172a";
+    statusEl.textContent = message;
+  };
+
+  let structureAutofillToken = 0;
+  let lastStructureAutofillSignature = "";
+
+  const clearInputValue = (input) => {
+    if (!input) return;
+    if (input.type === "checkbox") {
+      input.checked = false;
+      return;
+    }
+    input.value = "";
+  };
+
+  const setInputDisabledWithStyle = (input, disabled) => {
+    if (!input) return;
+    input.disabled = Boolean(disabled);
+    const wrapper = input.closest("div");
+    if (wrapper) {
+      wrapper.style.opacity = disabled ? "0.55" : "1";
+    }
+  };
+
+  const scanFieldDefaults = {
+    n_iter: nIterInput ? String(nIterInput.value || "10") : "10",
+    use_tddft_optimisation: useTddftOptimisationInput ? Boolean(useTddftOptimisationInput.checked) : true,
+    target_wavelength_nm: targetWavelengthInput ? String(targetWavelengthInput.value || "520.0") : "520.0",
+    target_wavelengths_nm: targetWavelengthBatchInput ? String(targetWavelengthBatchInput.value || "") : "",
+    tddft_scan_nroots: tddftScanNrootsInput ? String(tddftScanNrootsInput.value || "50") : "50",
+    single_final_tddft_nroots: singleFinalTddftNrootsInput ? String(singleFinalTddftNrootsInput.value || "50") : "50",
+    increment: incrementInput ? String(incrementInput.value || "0.05") : "0.05",
+    fix: fixInput ? String(fixInput.value || "0.5") : "0.5",
+    fixed_symbols: fixedSymbolsInput ? String(fixedSymbolsInput.value || "Cu") : "Cu",
+    distance_change_fraction: distanceChangeFractionInput
+      ? String(distanceChangeFractionInput.value || "1.0")
+      : "1.0",
+    enable_ts_smoothing: enableTsSmoothingInput ? Boolean(enableTsSmoothingInput.checked) : false,
+    refine_points_each_side: refinePointsEachSideInput
+      ? String(refinePointsEachSideInput.value || "0")
+      : "0",
+    restart_extend_steps: restartExtendStepsInput
+      ? String(restartExtendStepsInput.value || "0")
+      : "0",
+    restart_extend_increment_A: restartExtendIncrementInput
+      ? String(restartExtendIncrementInput.value || "")
+      : "",
+  };
+  let lastRunMode = null;
+
+  const currentHpcName = () => {
+    if (!hpcSelect) return "";
+    const option = hpcSelect.options && hpcSelect.selectedIndex >= 0
+      ? hpcSelect.options[hpcSelect.selectedIndex]
+      : null;
+    return option ? String(option.textContent || "").trim().toLowerCase() : "";
+  };
+
+  const isTrh408Selected = () => currentHpcName() === "trh408";
+  const isFalconSelected = () => currentHpcName() === "falcon";
+
+  const selectedQmBackend = () => (
+    qmBackendInput ? String(qmBackendInput.value || "orca").trim().toLowerCase() : "orca"
+  );
+
+  const moduleLoadLines = () => {
+    if (!moduleLoadsInput) return [];
+    return String(moduleLoadsInput.value || "")
+      .split(/\r?\n|,/)
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+  };
+
+  const moduleKey = (moduleName) => String(moduleName || "").trim().toLowerCase();
+  const isOrcaModule = (moduleName) => {
+    const key = moduleKey(moduleName);
+    return key === "orca" || key.startsWith("orca/");
+  };
+  const isNwchemModule = (moduleName) => {
+    const key = moduleKey(moduleName);
+    return key === "nwchem" || key.startsWith("nwchem/");
+  };
+  const appendModuleOnce = (modules, moduleName) => {
+    const key = moduleKey(moduleName);
+    if (!key) return;
+    if (modules.some((existing) => moduleKey(existing) === key)) return;
+    modules.push(moduleName);
+  };
+
+  const applyBackendEnvironment = () => {
+    if (!moduleLoadsInput) return;
+    const backend = selectedQmBackend();
+    let modules = moduleLoadLines();
+
+    if (backend === "nwchem") {
+      modules = modules.filter((moduleName) => (
+        !isOrcaModule(moduleName)
+        && !isNwchemModule(moduleName)
+        && moduleKey(moduleName) !== "other-software"
+      ));
+      if (isFalconSelected()) {
+        appendModuleOnce(modules, "intel");
+      }
+    } else if (backend === "orca") {
+      modules = modules.filter((moduleName) => (
+        !isNwchemModule(moduleName)
+        && moduleKey(moduleName) !== "other-software"
+      ));
+    }
+
+    moduleLoadsInput.value = modules.join("\n");
+  };
+
+  const applyQmBackendAvailability = () => {
+    if (!qmBackendInput) return;
+    const hasHpcSelection = Boolean(hpcSelect && String(hpcSelect.value || "").trim());
+    setInputDisabledWithStyle(qmBackendInput, !hasHpcSelection);
+    if (!hasHpcSelection) {
+      qmBackendInput.title = "Choose an HPC system before selecting the QM backend.";
+    } else {
+      qmBackendInput.title = "";
+    }
+  };
+
+  const selectedWorkflowLabel = () => {
+    if (!workflowSelect || workflowSelect.selectedIndex < 0) return "";
+    const option = workflowSelect.options[workflowSelect.selectedIndex];
+    return option ? String(option.textContent || "").trim().toLowerCase() : "";
+  };
+
+  const isTddftMlnebSelected = () => {
+    const backend = nebBackendInput ? String(nebBackendInput.value || "").trim().toLowerCase() : "";
+    return backend === "tddft_mlneb" || selectedWorkflowLabel().includes("tddft mlneb");
+  };
+
+  const isDftNebSelected = () => {
+    const backend = nebBackendInput ? String(nebBackendInput.value || "").trim().toLowerCase() : "";
+    return backend === "dft";
+  };
+
+  const applyHpcPrefill = () => {
+    if (!hpcSelect) return;
+    const selectedId = hpcSelect.value;
+    const prefill = mapping[selectedId];
+    if (!prefill) {
+      applyQmBackendAvailability();
+      applyBackendEnvironment();
+      return;
+    }
+
+    if (venvInput && typeof prefill.venv_activate_path === "string") {
+      venvInput.value = prefill.venv_activate_path;
+    }
+    if (moduleLoadsInput && typeof prefill.module_loads === "string") {
+      moduleLoadsInput.value = prefill.module_loads;
+    }
+    if (pythonpathInput && typeof prefill.pythonpath_entries === "string") {
+      pythonpathInput.value = prefill.pythonpath_entries;
+    }
+    if (remoteRunsRootInput && typeof prefill.remote_runs_root === "string") {
+      remoteRunsRootInput.value = prefill.remote_runs_root;
+    }
+    if (scratchBaseInput && typeof prefill.scratch_base === "string") {
+      scratchBaseInput.value = prefill.scratch_base;
+    }
+    if (nodesInput && typeof prefill.nodes === "string") {
+      nodesInput.value = prefill.nodes;
+    }
+    if (tasksPerNodeInput && typeof prefill.tasks_per_node === "string") {
+      tasksPerNodeInput.value = prefill.tasks_per_node;
+    }
+    if (cpusPerTaskInput && typeof prefill.cpus_per_task === "string") {
+      cpusPerTaskInput.value = prefill.cpus_per_task;
+    }
+    if (accountInput && typeof prefill.account === "string") {
+      accountInput.value = prefill.account;
+    }
+    if (partitionInput && typeof prefill.partition === "string") {
+      partitionInput.value = prefill.partition;
+    }
+    if (qosInput && typeof prefill.qos === "string") {
+      qosInput.value = prefill.qos;
+    }
+    if (reservationInput && typeof prefill.reservation === "string") {
+      reservationInput.value = prefill.reservation;
+    }
+    if (walltimeInput && typeof prefill.walltime === "string") {
+      walltimeInput.value = prefill.walltime;
+    }
+    if (coadsorbateMaceModelInput && typeof prefill.coadsorbate_mace_model_path === "string") {
+      coadsorbateMaceModelInput.value = prefill.coadsorbate_mace_model_path;
+    }
+    if (nebMaceModelInput && typeof prefill.neb_mace_model_path === "string") {
+      nebMaceModelInput.value = prefill.neb_mace_model_path;
+    }
+    applyQmBackendAvailability();
+    applyBackendEnvironment();
+  };
+
+  const applyReferenceAdsorbateFilter = () => {
+    if (!coadsorbateReferenceAdsorbatesInput) return;
+    const selectedSettingsProfile = settingsProfileSelect
+      ? String(settingsProfileSelect.value || "").trim()
+      : "";
+    let visibleOptionCount = 0;
+    for (const option of Array.from(coadsorbateReferenceAdsorbatesInput.options || [])) {
+      const optionSettingsProfile = String(option.dataset.settingsProfileId || "").trim();
+      const visible = !selectedSettingsProfile || !optionSettingsProfile || optionSettingsProfile === selectedSettingsProfile;
+      option.hidden = !visible;
+      option.disabled = !visible;
+      if (!visible) {
+        option.selected = false;
+        continue;
+      }
+      visibleOptionCount += 1;
+    }
+    const hasVisibleOptions = visibleOptionCount > 0;
+    coadsorbateReferenceAdsorbatesInput.disabled = !hasVisibleOptions;
+    const wrapper = coadsorbateReferenceAdsorbatesInput.closest("div");
+    if (wrapper) {
+      wrapper.style.opacity = hasVisibleOptions ? "1" : "0.55";
+    }
+  };
+
+  const applySettingsProfileBackendFilter = () => {
+    if (!settingsProfileSelect) return;
+    const selectedBackend = qmBackendInput
+      ? String(qmBackendInput.value || "orca").trim().toLowerCase()
+      : "orca";
+    let visibleOptionCount = 0;
+    let currentStillVisible = false;
+    let firstVisibleValue = "";
+    for (const option of Array.from(settingsProfileSelect.options || [])) {
+      const optionValue = String(option.value || "").trim();
+      if (!optionValue) {
+        option.hidden = false;
+        option.disabled = false;
+        continue;
+      }
+      const optionBackend = String(settingsProfileBackendMap[optionValue] || "orca").trim().toLowerCase();
+      const visible = optionBackend === selectedBackend;
+      option.hidden = !visible;
+      option.disabled = !visible;
+      if (visible) {
+        visibleOptionCount += 1;
+        if (!firstVisibleValue) firstVisibleValue = optionValue;
+        if (option.selected) currentStillVisible = true;
+      }
+    }
+    if (!currentStillVisible && firstVisibleValue) {
+      settingsProfileSelect.value = firstVisibleValue;
+    }
+    const hasVisibleOptions = visibleOptionCount > 0;
+    settingsProfileSelect.disabled = !hasVisibleOptions;
+    const wrapper = settingsProfileSelect.closest("div");
+    if (wrapper) {
+      wrapper.style.opacity = hasVisibleOptions ? "1" : "0.55";
+    }
+  };
+
+  const applyWorkflowModeFilter = () => {
+    if (!workflowSelect || !runModeSelect) return;
+    const runMode = String(runModeSelect.value || "single_optimisation");
+    const allowedIds = new Set((workflowModeMap[runMode] || []).map((value) => String(value || "").trim()));
+    let visibleCount = 0;
+    for (const option of Array.from(workflowSelect.options || [])) {
+      const optionValue = String(option.value || "").trim();
+      if (!optionValue) {
+        option.hidden = false;
+        option.disabled = false;
+        continue;
+      }
+      const visible = allowedIds.size === 0 || allowedIds.has(optionValue);
+      option.hidden = !visible;
+      option.disabled = !visible;
+      if (!visible) {
+        option.selected = false;
+        continue;
+      }
+      visibleCount += 1;
+    }
+
+    const hasVisibleOptions = visibleCount > 0;
+    workflowSelect.disabled = !hasVisibleOptions;
+    const wrapper = workflowSelect.closest("div");
+    if (wrapper) {
+      wrapper.style.opacity = hasVisibleOptions ? "1" : "0.55";
+    }
+    if (!hasVisibleOptions) {
+      return;
+    }
+
+    const currentSelection = String(workflowSelect.value || "").trim();
+    const currentValid = currentSelection && (allowedIds.size === 0 || allowedIds.has(currentSelection));
+    if (currentValid) {
+      return;
+    }
+
+    const preferredId = String(workflowPreferredByMode[runMode] || "").trim();
+    if (preferredId && (allowedIds.size === 0 || allowedIds.has(preferredId))) {
+      workflowSelect.value = preferredId;
+      return;
+    }
+    const firstVisible = Array.from(workflowSelect.options || []).find((option) => !option.disabled && !option.hidden);
+    if (firstVisible) {
+      workflowSelect.value = String(firstVisible.value || "").trim();
+    }
+  };
+
+  const getCurrentPresetBundle = () => {
+    if (!hpcSelect) return { default: "custom", presets: [{ id: "custom", label: "Custom (manual)", values: {} }] };
+    return slurmPresetsMap[hpcSelect.value] || { default: "custom", presets: [{ id: "custom", label: "Custom (manual)", values: {} }] };
+  };
+
+  const refreshSlurmPresetChoices = ({ forceDefault = false } = {}) => {
+    if (!slurmPresetSelect) return;
+    const bundle = getCurrentPresetBundle();
+    const presets = Array.isArray(bundle.presets) ? bundle.presets : [];
+    const previous = String(slurmPresetSelect.value || "");
+    const validIds = new Set(presets.map((preset) => String((preset && preset.id) || "")));
+    const defaultPreset = String(bundle.default || "custom");
+    const selected = forceDefault
+      ? defaultPreset
+      : (validIds.has(previous) ? previous : defaultPreset);
+
+    slurmPresetSelect.innerHTML = "";
+    for (const preset of presets) {
+      if (!preset || typeof preset !== "object") continue;
+      const id = String(preset.id || "").trim();
+      const label = String(preset.label || "").trim();
+      if (!id || !label) continue;
+      const option = document.createElement("option");
+      option.value = id;
+      option.textContent = label;
+      if (id === selected) option.selected = true;
+      slurmPresetSelect.appendChild(option);
+    }
+
+    if (!slurmPresetSelect.value) {
+      slurmPresetSelect.value = "custom";
+    }
+  };
+
+  const applySelectedSlurmPreset = () => {
+    if (!slurmPresetSelect) return;
+    const bundle = getCurrentPresetBundle();
+    const selectedId = String(slurmPresetSelect.value || "custom");
+    const presets = Array.isArray(bundle.presets) ? bundle.presets : [];
+    const selected = presets.find((preset) => preset && String(preset.id || "") === selectedId);
+    if (!selected || typeof selected !== "object") return;
+    const values = selected.values && typeof selected.values === "object" ? selected.values : {};
+
+    const applyValue = (input, key) => {
+      if (!input) return;
+      if (!Object.prototype.hasOwnProperty.call(values, key)) return;
+      const value = values[key];
+      if (value === null || typeof value === "undefined") return;
+      input.value = String(value);
+    };
+
+    applyValue(nodesInput, "nodes");
+    applyValue(tasksPerNodeInput, "tasks_per_node");
+    applyValue(cpusPerTaskInput, "cpus_per_task");
+    applyValue(accountInput, "account");
+    applyValue(partitionInput, "partition");
+    applyValue(qosInput, "qos");
+    applyValue(reservationInput, "reservation");
+    applyValue(walltimeInput, "walltime");
+  };
+
+  const updateNebPreflight = () => {
+    if (!nebPreflightSummary) return;
+    const runMode = runModeSelect ? String(runModeSelect.value || "") : "";
+    if (runMode !== "active_learning_neb") {
+      nebPreflightSummary.textContent = "";
+      return;
+    }
+    const minImages = Number.parseInt(String(document.getElementById("id_neb_min_images")?.value || "7"), 10);
+    const maxImages = Number.parseInt(String(document.getElementById("id_neb_max_images")?.value || "21"), 10);
+    const shift = Number.parseFloat(String(document.getElementById("id_neb_atom_shift_per_image_A")?.value || "0.2"));
+    const strategy = nebFinalImageStrategySelect
+      ? String(nebFinalImageStrategySelect.value || "explicit_final_image")
+      : "explicit_final_image";
+    const backendLabel = isTddftMlnebSelected() ? "TDDFT MLNEB" : (isDftNebSelected() ? "DFT NEB" : "MACE NEB");
+    const parts = [
+      `${backendLabel}`,
+      `image limits ${Number.isFinite(minImages) ? minImages : "?"}-${Number.isFinite(maxImages) ? maxImages : "?"}`,
+      `atom-shift target ${Number.isFinite(shift) ? shift : "?"} A/image`,
+    ];
+    if (strategy === "explicit_final_image") {
+      parts.push("explicit final image required; atom ordering must match initial image");
+    } else {
+      const i = nebBreakBondIInput ? String(nebBreakBondIInput.value || "").trim() : "";
+      const j = nebBreakBondJInput ? String(nebBreakBondJInput.value || "").trim() : "";
+      const distance = nebBreakBondExtensionInput ? String(nebBreakBondExtensionInput.value || "").trim() : "";
+      parts.push(`generated final image from bond ${i || "?"}-${j || "?"} at ${distance || "?"} A`);
+    }
+    nebPreflightSummary.textContent = parts.join(" | ");
+  };
+
+  const applyNebBackendPanels = () => {
+    const nebSelected = runModeSelect && String(runModeSelect.value || "") === "active_learning_neb";
+    if (nebBackendInput && nebSelected) {
+      const label = selectedWorkflowLabel();
+      if (label.includes("tddft mlneb") && String(nebBackendInput.value || "") !== "tddft_mlneb") {
+        nebBackendInput.value = "tddft_mlneb";
+      } else if (!label.includes("tddft mlneb") && String(nebBackendInput.value || "") === "tddft_mlneb") {
+        nebBackendInput.value = "mace";
+      }
+    }
+    const tddftMlnebSelected = Boolean(nebSelected && isTddftMlnebSelected());
+    const dftNebSelected = Boolean(nebSelected && isDftNebSelected());
+    if (nebMaceSettingsPanel) {
+      nebMaceSettingsPanel.style.display = nebSelected && !tddftMlnebSelected && !dftNebSelected ? "grid" : "none";
+    }
+    if (nebTddftSettingsPanel) {
+      nebTddftSettingsPanel.style.display = tddftMlnebSelected ? "block" : "none";
+    }
+    if (nebDftSettingsPanel) {
+      nebDftSettingsPanel.style.display = dftNebSelected ? "block" : "none";
+    }
+    if (targetWavelengthInput && tddftMlnebSelected && !String(targetWavelengthInput.value || "").trim()) {
+      targetWavelengthInput.value = scanFieldDefaults.target_wavelength_nm;
+    }
+    if (tddftScanNrootsInput && tddftMlnebSelected && !String(tddftScanNrootsInput.value || "").trim()) {
+      tddftScanNrootsInput.value = scanFieldDefaults.tddft_scan_nroots;
+    }
+    const tddftScanSelected = runModeSelect && String(runModeSelect.value || "") === "tddft_bond_scan";
+    setInputDisabledWithStyle(targetWavelengthInput, !(tddftScanSelected || tddftMlnebSelected));
+    setInputDisabledWithStyle(tddftScanNrootsInput, !(tddftScanSelected || tddftMlnebSelected));
+    setInputDisabledWithStyle(targetWavelengthBatchInput, !tddftScanSelected);
+    updateNebPreflight();
+  };
+
+  const applyRunMode = () => {
+    if (!runModeSelect) return;
+    const runMode = String(runModeSelect.value || "single_optimisation");
+    const singleSelected = runMode === "single_optimisation";
+    const tddftSelected = runMode === "tddft_bond_scan";
+    const ctSelected = runMode === "charge_transfer";
+    const combinedCtSelected = Boolean(
+      singleSelected && singleChargeTransferSpectrumInput && singleChargeTransferSpectrumInput.checked
+    );
+    const nebSelected = runMode === "active_learning_neb";
+    const tddftMlnebSelected = Boolean(nebSelected && isTddftMlnebSelected());
+    const dftNebSelected = Boolean(nebSelected && isDftNebSelected());
+    const coadsorbateSelected = runMode === "coadsorbate_placement";
+    const gpuWorkflowSelected = (nebSelected && !tddftMlnebSelected && !dftNebSelected) || coadsorbateSelected;
+    const modeChanged = runMode !== lastRunMode;
+
+    if (singleModePanel) {
+      singleModePanel.style.display = singleSelected ? "block" : "none";
+    }
+    if (ctModePanel) {
+      ctModePanel.style.display = (ctSelected || combinedCtSelected) ? "block" : "none";
+    }
+    const ctStandaloneNote = document.getElementById("ct-standalone-note");
+    const ctCombinedNote = document.getElementById("ct-combined-note");
+    const ctOrcaBasenameWrap = document.getElementById("ct-orca-basename-wrap");
+    const ctNrootsWrap = document.getElementById("ct-nroots-wrap");
+    if (ctStandaloneNote) ctStandaloneNote.style.display = ctSelected ? "block" : "none";
+    if (ctCombinedNote) ctCombinedNote.style.display = combinedCtSelected ? "block" : "none";
+    if (ctOrcaBasenameWrap) ctOrcaBasenameWrap.style.display = ctSelected ? "block" : "none";
+    if (ctNrootsWrap) ctNrootsWrap.style.display = ctSelected ? "block" : "none";
+    if (combinedCtSelected && singleFinalTddftSpectrumInput) {
+      singleFinalTddftSpectrumInput.checked = true;
+    }
+    [fmaxControlWrap, optimizerControlWrap, spinControlWrap].forEach((element) => {
+      if (element) element.style.display = ctSelected ? "none" : "block";
+    });
+    if (tddftModePanel) {
+      tddftModePanel.style.display = (tddftSelected || tddftMlnebSelected) ? "block" : "none";
+    }
+    if (nebModePanel) {
+      nebModePanel.style.display = nebSelected ? "block" : "none";
+    }
+    if (coadsorbateModePanel) {
+      coadsorbateModePanel.style.display = coadsorbateSelected ? "block" : "none";
+    }
+    if (coadsorbateClusterPanel) {
+      coadsorbateClusterPanel.style.display = coadsorbateSelected ? "block" : "none";
+    }
+    if (nebFinalImagePanel) {
+      nebFinalImagePanel.style.display = nebSelected ? "block" : "none";
+    }
+    if (constraintControlsPanel) {
+      constraintControlsPanel.style.display = (tddftSelected || singleSelected || nebSelected) ? "block" : "none";
+    }
+    if (constraintControlsTitle) {
+      if (tddftSelected) {
+        constraintControlsTitle.textContent = "Bond-Scan Constraints (TDDFT Mode)";
+      } else if (nebSelected) {
+        constraintControlsTitle.textContent = "NEB Constraints (Fixed Symbols)";
+      } else {
+        constraintControlsTitle.textContent = "Single-Optimisation Constraints";
+      }
+    }
+    if (qmBackendWrap) {
+      qmBackendWrap.style.display = (singleSelected || tddftSelected || ctSelected) ? "block" : "none";
+    }
+
+    applyQmBackendAvailability();
+    applySettingsProfileBackendFilter();
+    applyBackendEnvironment();
+    applyWorkflowModeFilter();
+    applyReferenceIntent();
+
+    setInputDisabledWithStyle(geometrySourceSelect, false);
+    setInputDisabledWithStyle(qmBackendInput, !(singleSelected || tddftSelected || ctSelected) || !(hpcSelect && String(hpcSelect.value || "").trim()));
+    setInputDisabledWithStyle(nebBackendInput, !nebSelected);
+    setInputDisabledWithStyle(targetWavelengthInput, !(tddftSelected || tddftMlnebSelected));
+    setInputDisabledWithStyle(targetWavelengthBatchInput, !tddftSelected);
+    setInputDisabledWithStyle(tddftScanNrootsInput, !(tddftSelected || tddftMlnebSelected));
+    setInputDisabledWithStyle(singleFinalTddftSpectrumInput, !singleSelected);
+    setInputDisabledWithStyle(singleFinalTddftNrootsModeInput, !singleSelected);
+    const scaledFinalNroots = singleFinalTddftNrootsModeInput
+      && String(singleFinalTddftNrootsModeInput.value || "") === "scaled_by_atoms";
+    setInputDisabledWithStyle(singleFinalTddftNrootsInput, !singleSelected || scaledFinalNroots);
+    setInputDisabledWithStyle(nIterInput, !tddftSelected);
+    setInputDisabledWithStyle(useTddftOptimisationInput, !tddftSelected);
+    setInputDisabledWithStyle(incrementInput, !tddftSelected);
+    setInputDisabledWithStyle(distanceChangeFractionInput, !tddftSelected);
+    setInputDisabledWithStyle(enableTsSmoothingInput, !tddftSelected);
+    setInputDisabledWithStyle(refinePointsEachSideInput, !tddftSelected);
+    setInputDisabledWithStyle(restartExtendStepsInput, !tddftSelected);
+    applyRestartExtensionControls();
+
+    if (singleSelected && singleFinalTddftNrootsInput && !String(singleFinalTddftNrootsInput.value || "").trim()) {
+      singleFinalTddftNrootsInput.value = scanFieldDefaults.single_final_tddft_nroots;
+    }
+
+    const disableBondControls = coadsorbateSelected || nebSelected || ctSelected;
+    setInputDisabledWithStyle(bondIInput, disableBondControls);
+    setInputDisabledWithStyle(bondJInput, disableBondControls);
+    setInputDisabledWithStyle(fixInput, disableBondControls);
+    setInputDisabledWithStyle(targetDistanceInput, disableBondControls);
+    setInputDisabledWithStyle(fixedSymbolsInput, coadsorbateSelected);
+
+    if (!tddftSelected && !tddftMlnebSelected && modeChanged) {
+      [
+        useTddftOptimisationInput,
+        targetWavelengthInput,
+        targetWavelengthBatchInput,
+        tddftScanNrootsInput,
+        incrementInput,
+        distanceChangeFractionInput,
+        enableTsSmoothingInput,
+        refinePointsEachSideInput,
+        restartExtendStepsInput,
+        restartExtendIncrementInput,
+      ].forEach(clearInputValue);
+    }
+
+    if (tddftSelected && modeChanged) {
+      if (nIterInput && !String(nIterInput.value || "").trim()) {
+        nIterInput.value = scanFieldDefaults.n_iter;
+      }
+      if (useTddftOptimisationInput) {
+        useTddftOptimisationInput.checked = Boolean(scanFieldDefaults.use_tddft_optimisation);
+      }
+      if (targetWavelengthInput && !String(targetWavelengthInput.value || "").trim()) {
+        targetWavelengthInput.value = scanFieldDefaults.target_wavelength_nm;
+      }
+      if (targetWavelengthBatchInput && !String(targetWavelengthBatchInput.value || "").trim()) {
+        targetWavelengthBatchInput.value = scanFieldDefaults.target_wavelengths_nm;
+      }
+      if (tddftScanNrootsInput && !String(tddftScanNrootsInput.value || "").trim()) {
+        tddftScanNrootsInput.value = scanFieldDefaults.tddft_scan_nroots;
+      }
+      if (incrementInput && !String(incrementInput.value || "").trim()) {
+        incrementInput.value = scanFieldDefaults.increment;
+      }
+      if (fixInput && !String(fixInput.value || "").trim()) {
+        fixInput.value = scanFieldDefaults.fix;
+      }
+      if (fixedSymbolsInput && !String(fixedSymbolsInput.value || "").trim()) {
+        fixedSymbolsInput.value = scanFieldDefaults.fixed_symbols;
+      }
+      if (distanceChangeFractionInput && !String(distanceChangeFractionInput.value || "").trim()) {
+        distanceChangeFractionInput.value = scanFieldDefaults.distance_change_fraction;
+      }
+      if (enableTsSmoothingInput) {
+        enableTsSmoothingInput.checked = Boolean(scanFieldDefaults.enable_ts_smoothing);
+      }
+      if (refinePointsEachSideInput && !String(refinePointsEachSideInput.value || "").trim()) {
+        refinePointsEachSideInput.value = scanFieldDefaults.refine_points_each_side;
+      }
+      if (restartExtendStepsInput && !String(restartExtendStepsInput.value || "").trim()) {
+        restartExtendStepsInput.value = scanFieldDefaults.restart_extend_steps;
+      }
+      if (restartExtendIncrementInput && !String(restartExtendIncrementInput.value || "").trim()) {
+        restartExtendIncrementInput.value = scanFieldDefaults.restart_extend_increment_A;
+      }
+    }
+
+    if (coadsorbateSelected && modeChanged) {
+      [
+        useTddftOptimisationInput,
+        targetWavelengthInput,
+        targetWavelengthBatchInput,
+        tddftScanNrootsInput,
+        bondIInput,
+        bondJInput,
+        incrementInput,
+        fixInput,
+        fixedSymbolsInput,
+        targetDistanceInput,
+        distanceChangeFractionInput,
+        enableTsSmoothingInput,
+        refinePointsEachSideInput,
+        restartExtendStepsInput,
+        restartExtendIncrementInput,
+      ].forEach(clearInputValue);
+    }
+
+    lastRunMode = runMode;
+    applyNebBackendPanels();
+
+    if (gpuWorkflowSelected) {
+      const trh408Selected = isTrh408Selected();
+      if (coadsorbateSelected && geometrySourceSelect) {
+        geometrySourceSelect.value = "upload_file";
+      }
+      const customPresetSelected = !slurmPresetSelect || String(slurmPresetSelect.value || "custom") === "custom";
+      if (customPresetSelected) {
+        if (nodesInput && (!String(nodesInput.value || "").trim() || String(nodesInput.value) === "2")) {
+          nodesInput.value = "1";
+        }
+        if (tasksPerNodeInput && (!String(tasksPerNodeInput.value || "").trim() || String(tasksPerNodeInput.value) === "32")) {
+          tasksPerNodeInput.value = "1";
+        }
+        if (cpusPerTaskInput && (!String(cpusPerTaskInput.value || "").trim() || String(cpusPerTaskInput.value) === "1")) {
+          cpusPerTaskInput.value = trh408Selected ? "8" : "1";
+        }
+        if (trh408Selected) {
+          if (partitionInput) {
+            const currentPartition = String(partitionInput.value || "").trim().toLowerCase();
+            if (!currentPartition || currentPartition === "standard" || currentPartition === "gpu" || currentPartition === "main") {
+              partitionInput.value = "";
+            }
+          }
+          if (qosInput) {
+            const currentQos = String(qosInput.value || "").trim().toLowerCase();
+            if (!currentQos || currentQos === "standard" || currentQos === "long" || currentQos === "gpu-shd") {
+              qosInput.value = "";
+            }
+          }
+          if (accountInput) {
+            const currentAccount = String(accountInput.value || "").trim().toLowerCase();
+            if (!currentAccount || currentAccount === "SLURM_ACCOUNT") {
+              accountInput.value = "";
+            }
+          }
+        } else {
+          if (partitionInput) {
+            const currentPartition = String(partitionInput.value || "").trim().toLowerCase();
+            if (!currentPartition || currentPartition === "standard") {
+              partitionInput.value = "gpu";
+            }
+          }
+          if (qosInput) {
+            const currentQos = String(qosInput.value || "").trim().toLowerCase();
+            if (!currentQos || currentQos === "standard" || currentQos === "long") {
+              qosInput.value = "gpu-shd";
+            }
+          }
+          if (accountInput && !String(accountInput.value || "").trim()) {
+            accountInput.value = "SLURM_ACCOUNT";
+          }
+        }
+        if (walltimeInput) {
+          const currentWalltime = String(walltimeInput.value || "").trim();
+          if (!currentWalltime || currentWalltime === "24:00:00" || currentWalltime === "96:00:00") {
+            walltimeInput.value = "12:00:00";
+          }
+        }
+      }
+      applyGeometrySource();
+      applyNebFinalImageStrategy();
+      return;
+    }
+
+    if (!tddftSelected) {
+      applyGeometrySource();
+      applyNebFinalImageStrategy();
+      return;
+    }
+    const customPresetSelected = !slurmPresetSelect || String(slurmPresetSelect.value || "custom") === "custom";
+    if (!customPresetSelected) {
+      applyNebFinalImageStrategy();
+      return;
+    }
+    if (qosInput && typeof tddftDefaults.qos === "string") {
+      const currentQos = String(qosInput.value || "").trim().toLowerCase();
+      if (!currentQos || currentQos === "standard") {
+        qosInput.value = tddftDefaults.qos;
+      }
+    }
+    if (walltimeInput && typeof tddftDefaults.walltime === "string") {
+      const currentWalltime = String(walltimeInput.value || "").trim();
+      if (!currentWalltime || currentWalltime === "24:00:00") {
+        walltimeInput.value = tddftDefaults.walltime;
+      }
+    }
+    applyNebFinalImageStrategy();
+  };
+
+  const applyGeometrySource = () => {
+    if (!geometrySourceSelect) return;
+    const source = geometrySourceSelect.value;
+    if (geometryUploadPanel) {
+      geometryUploadPanel.style.display = source === "upload_file" ? "grid" : "none";
+    }
+    if (geometryAsePanel) {
+      geometryAsePanel.style.display = source === "ase_molecule" ? "block" : "none";
+    }
+    if (geometryPubchemPanel) {
+      geometryPubchemPanel.style.display = source === "pubchem" ? "grid" : "none";
+    }
+    if (geometryExistingPanel) {
+      geometryExistingPanel.style.display = source === "existing_run" ? "block" : "none";
+    }
+    applyTrajBatchControls();
+    applyRestartExtensionControls();
+  };
+
+  const applyRestartExtensionControls = () => {
+    if (!restartExtendIncrementInput) return;
+    const tddftSelected = runModeSelect && String(runModeSelect.value || "") === "tddft_bond_scan";
+    const restartSteps = restartExtendStepsInput
+      ? Number.parseInt(String(restartExtendStepsInput.value || "0").trim() || "0", 10)
+      : 0;
+    const hasRestartSteps = Number.isFinite(restartSteps) && restartSteps > 0;
+    const allowIncrement = Boolean(tddftSelected && hasRestartSteps);
+    setInputDisabledWithStyle(restartExtendIncrementInput, !allowIncrement);
+    if (!allowIncrement) {
+      restartExtendIncrementInput.value = "";
+    }
+  };
+
+  const applyNebFinalGeometrySource = () => {
+    if (!nebFinalGeometrySourceSelect) return;
+    const strategy = nebFinalImageStrategySelect
+      ? String(nebFinalImageStrategySelect.value || "explicit_final_image")
+      : "explicit_final_image";
+    if (strategy !== "explicit_final_image") {
+      if (nebFinalUploadPanel) {
+        nebFinalUploadPanel.style.display = "none";
+      }
+      if (nebFinalAsePanel) {
+        nebFinalAsePanel.style.display = "none";
+      }
+      if (nebFinalPubchemPanel) {
+        nebFinalPubchemPanel.style.display = "none";
+      }
+      if (nebFinalExistingPanel) {
+        nebFinalExistingPanel.style.display = "none";
+      }
+      return;
+    }
+    const source = String(nebFinalGeometrySourceSelect.value || "upload_file");
+    if (nebFinalUploadPanel) {
+      nebFinalUploadPanel.style.display = source === "upload_file" ? "grid" : "none";
+    }
+    if (nebFinalAsePanel) {
+      nebFinalAsePanel.style.display = source === "ase_molecule" ? "block" : "none";
+    }
+    if (nebFinalPubchemPanel) {
+      nebFinalPubchemPanel.style.display = source === "pubchem" ? "grid" : "none";
+    }
+    if (nebFinalExistingPanel) {
+      nebFinalExistingPanel.style.display = source === "existing_run" ? "block" : "none";
+    }
+  };
+
+  const applyNebFinalImageStrategy = () => {
+    const strategy = nebFinalImageStrategySelect
+      ? String(nebFinalImageStrategySelect.value || "explicit_final_image")
+      : "explicit_final_image";
+    const explicitSelected = strategy === "explicit_final_image";
+    if (nebFinalExplicitPanel) {
+      nebFinalExplicitPanel.style.display = explicitSelected ? "block" : "none";
+    }
+    if (nebFinalBondBreakPanel) {
+      nebFinalBondBreakPanel.style.display = explicitSelected ? "none" : "block";
+    }
+
+    setInputDisabledWithStyle(nebFinalGeometrySourceSelect, !explicitSelected);
+    setInputDisabledWithStyle(nebFinalStructureFileInput, !explicitSelected);
+    setInputDisabledWithStyle(nebFinalTrajFrameInput, !explicitSelected);
+    setInputDisabledWithStyle(nebFinalAseFormulaInput, !explicitSelected);
+    setInputDisabledWithStyle(nebFinalPubchemCidInput, !explicitSelected);
+    setInputDisabledWithStyle(nebFinalPubchemQueryInput, !explicitSelected);
+    setInputDisabledWithStyle(nebBreakBondIInput, explicitSelected);
+    setInputDisabledWithStyle(nebBreakBondJInput, explicitSelected);
+    setInputDisabledWithStyle(nebBreakBondExtensionInput, explicitSelected);
+    setInputDisabledWithStyle(nebBreakBondFixInput, explicitSelected);
+    setInputDisabledWithStyle(nebBreakAssertBrokenInput, explicitSelected);
+    setInputDisabledWithStyle(nebBreakCutoffScaleInput, explicitSelected);
+
+    applyNebFinalGeometrySource();
+  };
+
+  const applyTrajBatchControls = () => {
+    const coadsorbateSelected = runModeSelect && runModeSelect.value === "coadsorbate_placement";
+    const nebSelected = runModeSelect && runModeSelect.value === "active_learning_neb";
+    const ctSelected = runModeSelect && runModeSelect.value === "charge_transfer";
+    const source = geometrySourceSelect ? geometrySourceSelect.value : "upload_file";
+    const isUploadFile = source === "upload_file";
+    const isExistingRun = source === "existing_run";
+    const hasBatchFile = Boolean(
+      structureInput &&
+      typeof structureInput.value === "string" &&
+      [".traj", ".db"].some((suffix) => structureInput.value.toLowerCase().endsWith(suffix))
+    );
+    if (submitAllTrajInput) {
+      submitAllTrajInput.disabled = coadsorbateSelected || nebSelected || ctSelected || (!isExistingRun && !(isUploadFile && hasBatchFile));
+      if (submitAllTrajInput.disabled) {
+        submitAllTrajInput.checked = false;
+      }
+    }
+    if (trajFrameInput) {
+      trajFrameInput.disabled = Boolean(submitAllTrajInput && submitAllTrajInput.checked);
+    }
+  };
+
+  const applyReferenceIntent = () => {
+    if (!referenceIntentSelect || !referenceNameWrap) return;
+    const coadsorbateSelected = runModeSelect && runModeSelect.value === "coadsorbate_placement";
+    const ctSelected = runModeSelect && runModeSelect.value === "charge_transfer";
+    const referenceDisabled = coadsorbateSelected || ctSelected;
+    if (referenceIntentWrap) {
+      referenceIntentWrap.style.display = referenceDisabled ? "none" : "block";
+    }
+    if (referenceDisabled) {
+      referenceIntentSelect.value = "none";
+      referenceIntentSelect.disabled = true;
+      if (referenceNameInput) {
+        referenceNameInput.value = "";
+        referenceNameInput.disabled = true;
+      }
+      referenceNameWrap.style.display = "none";
+      return;
+    }
+
+    referenceIntentSelect.disabled = false;
+    if (referenceNameInput) {
+      referenceNameInput.disabled = false;
+    }
+    const isReference = String(referenceIntentSelect.value || "none") !== "none";
+    referenceNameWrap.style.display = isReference ? "block" : "none";
+  };
+
+  const appendNebPreviewPayload = (payload) => {
+    if (!payload) return;
+    const runMode = runModeSelect ? String(runModeSelect.value || "single_optimisation") : "single_optimisation";
+    payload.append("run_mode", runMode);
+    if (runMode !== "active_learning_neb") {
+      return;
+    }
+    const finalStrategy = nebFinalImageStrategySelect
+      ? String(nebFinalImageStrategySelect.value || "explicit_final_image")
+      : "explicit_final_image";
+    payload.append("neb_final_image_strategy", finalStrategy);
+    if (finalStrategy !== "set_bond_distance_from_initial" && finalStrategy !== "bond_extension_from_initial") {
+      return;
+    }
+    if (nebBreakBondIInput && String(nebBreakBondIInput.value || "").trim()) {
+      payload.append("neb_break_bond_i", String(nebBreakBondIInput.value || "").trim());
+    }
+    if (nebBreakBondJInput && String(nebBreakBondJInput.value || "").trim()) {
+      payload.append("neb_break_bond_j", String(nebBreakBondJInput.value || "").trim());
+    }
+    if (nebBreakBondExtensionInput && String(nebBreakBondExtensionInput.value || "").trim()) {
+      payload.append("neb_break_bond_extension_A", String(nebBreakBondExtensionInput.value || "").trim());
+      payload.append("neb_set_bond_distance_A", String(nebBreakBondExtensionInput.value || "").trim());
+    }
+    if (nebBreakBondFixInput && String(nebBreakBondFixInput.value || "").trim()) {
+      payload.append("neb_break_bond_fix", String(nebBreakBondFixInput.value || "").trim());
+    }
+    if (nebBreakCutoffScaleInput && String(nebBreakCutoffScaleInput.value || "").trim()) {
+      payload.append("neb_break_cutoff_scale", String(nebBreakCutoffScaleInput.value || "").trim());
+    }
+    if (nebBreakAssertBrokenInput && nebBreakAssertBrokenInput.checked) {
+      payload.append("neb_break_assert_broken", "on");
+    }
+  };
+
+  const buildStructureFormData = () => {
+    const source = geometrySourceSelect ? String(geometrySourceSelect.value || "upload_file") : "upload_file";
+    const payload = new FormData();
+    payload.append("geometry_source", source);
+
+    if (source === "upload_file") {
+      if (!structureInput || !structureInput.files || structureInput.files.length === 0) {
+        throw new Error("Select a structure file first.");
+      }
+      payload.append("structure_file", structureInput.files[0]);
+      if (trajFrameInput) {
+        payload.append("traj_frame", String(trajFrameInput.value || "-1"));
+      }
+      appendNebPreviewPayload(payload);
+      return payload;
+    }
+
+    if (source === "ase_molecule") {
+      const formula = aseFormulaInput ? String(aseFormulaInput.value || "").trim() : "";
+      if (!formula) {
+        throw new Error("Enter ASE molecule formula/name.");
+      }
+      payload.append("ase_molecule_formula", formula);
+      appendNebPreviewPayload(payload);
+      return payload;
+    }
+
+    if (source === "pubchem") {
+      const cid = pubchemCidInput ? String(pubchemCidInput.value || "").trim() : "";
+      const query = pubchemQueryInput ? String(pubchemQueryInput.value || "").trim() : "";
+      if (!cid && !query) {
+        throw new Error("Provide PubChem CID or query.");
+      }
+      if (cid) payload.append("pubchem_cid", cid);
+      if (query) payload.append("pubchem_query", query);
+      appendNebPreviewPayload(payload);
+      return payload;
+    }
+
+    if (source === "existing_run") {
+      const runId = sourceRunIdInput ? String(sourceRunIdInput.value || "").trim() : "";
+      const artifactId = sourceArtifactIdInput ? String(sourceArtifactIdInput.value || "").trim() : "";
+      if (!runId || !artifactId) {
+        throw new Error("No source run structure is selected.");
+      }
+      payload.append("source_run_id", runId);
+      payload.append("source_artifact_id", artifactId);
+      appendNebPreviewPayload(payload);
+      return payload;
+    }
+
+    throw new Error("Unsupported geometry source.");
+  };
+
+  const postStructureTool = async (url) => {
+    const payload = buildStructureFormData();
+    const headers = {};
+    if (csrfToken) headers["X-CSRFToken"] = csrfToken;
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: payload,
+      credentials: "same-origin",
+    });
+    let data = {};
+    try {
+      data = await response.json();
+    } catch (_) {
+      throw new Error("Server returned a non-JSON response.");
+    }
+    if (!response.ok || !data.ok) {
+      throw new Error(data.error || "Action failed.");
+    }
+    return data;
+  };
+
+  const deriveCoadsorbateSymbols = (data) => {
+    const elementCounts = data && typeof data.element_counts === "object" && data.element_counts
+      ? data.element_counts
+      : {};
+    const elementMaxZ = data && typeof data.element_max_z === "object" && data.element_max_z
+      ? data.element_max_z
+      : {};
+    const symbols = Object.keys(elementCounts).filter((symbol) => String(symbol || "").trim());
+    if (!symbols.length) {
+      return null;
+    }
+
+    const sortedBySurface = symbols.slice().sort((left, right) => {
+      const leftZ = Number(elementMaxZ[left]);
+      const rightZ = Number(elementMaxZ[right]);
+      const leftValid = Number.isFinite(leftZ);
+      const rightValid = Number.isFinite(rightZ);
+      if (leftValid && rightValid && rightZ !== leftZ) {
+        return rightZ - leftZ;
+      }
+      if (leftValid && !rightValid) {
+        return -1;
+      }
+      if (!leftValid && rightValid) {
+        return 1;
+      }
+      return String(left).localeCompare(String(right));
+    });
+
+    return {
+      siteSymbols: sortedBySurface,
+      passiveSymbols: sortedBySurface,
+      supportSymbols: sortedBySurface,
+    };
+  };
+
+  const applyCoadsorbateSymbolAutofill = (symbolsPayload) => {
+    if (!symbolsPayload) return;
+    if (!coadsorbateSiteSymbolsInput || !coadsorbatePassiveSymbolsInput || !coadsorbateSupportSpeciesInput) return;
+    coadsorbateSiteSymbolsInput.value = symbolsPayload.siteSymbols.join(",");
+    coadsorbatePassiveSymbolsInput.value = symbolsPayload.passiveSymbols.join(",");
+    coadsorbateSupportSpeciesInput.value = symbolsPayload.supportSymbols.join(",");
+  };
+
+  const applyInferredValue = (input, value) => {
+    if (!input || value === null || typeof value === "undefined" || String(value).trim() === "") return;
+    const current = String(input.value || "").trim();
+    const previous = String(input.dataset.inferredValue || "").trim();
+    if (current && current !== previous) return;
+    input.value = String(value);
+    input.dataset.inferredValue = String(value);
+  };
+
+  const applyCtAutofill = (data, { combined }) => {
+    const fragments = data && typeof data.ct_fragments === "object" && data.ct_fragments
+      ? data.ct_fragments
+      : {};
+    applyInferredValue(ctNanoparticleIndicesInput, fragments.nanoparticle_indices);
+    applyInferredValue(ctAdsorbateIndicesInput, fragments.adsorbate_indices);
+    if (!combined) {
+      applyInferredValue(ctNrootsInput, data ? data.ct_nroots : null);
+    }
+  };
+
+  const maybeAutofillCoadsorbateSymbolsFromStructure = async () => {
+    const runMode = runModeSelect ? String(runModeSelect.value || "") : "";
+    const coadsorbateSelected = runMode === "coadsorbate_placement";
+    const combinedCtSelected = Boolean(
+      runMode === "single_optimisation"
+      && singleChargeTransferSpectrumInput
+      && singleChargeTransferSpectrumInput.checked
+    );
+    const ctSelected = runMode === "charge_transfer" || combinedCtSelected;
+    if (!coadsorbateSelected && !ctSelected) return;
+
+    const currentToken = ++structureAutofillToken;
+    try {
+      const data = await postStructureTool("{% url 'job-structure-preview' %}");
+      if (currentToken !== structureAutofillToken) {
+        return;
+      }
+      if (coadsorbateSelected) {
+        const derived = deriveCoadsorbateSymbols(data);
+        if (derived) {
+          const signature = JSON.stringify(derived);
+          if (signature !== lastStructureAutofillSignature) {
+            applyCoadsorbateSymbolAutofill(derived);
+            lastStructureAutofillSignature = signature;
+          }
+        }
+      }
+      if (ctSelected) {
+        applyCtAutofill(data, { combined: combinedCtSelected });
+      }
+    } catch (_) {
+      // Geometry may be incomplete while user edits; keep current values until parsing succeeds.
+    }
+  };
+
+  const scheduleCoadsorbateSymbolAutofill = () => {
+    window.setTimeout(() => {
+      void maybeAutofillCoadsorbateSymbolsFromStructure();
+    }, 0);
+  };
+
+  const renderPreview = (data) => {
+    if (!previewPanel || !previewMeta || !previewElements || !previewRows || !previewXyz) return;
+
+    const meta = data.metadata || {};
+    const metaParts = [
+      `Source: ${escapeHtml(meta.source || "")}`,
+      `Formula: ${escapeHtml(meta.formula || "")}`,
+      `Atoms: ${escapeHtml(meta.atom_count || 0)}`,
+    ];
+    if (meta.source_filename) {
+      metaParts.push(`File: ${escapeHtml(meta.source_filename)}`);
+    }
+    if (typeof meta.frame_index !== "undefined" && meta.frame_index !== null) {
+      metaParts.push(`Frame: ${escapeHtml(meta.frame_index)}`);
+    }
+    if (meta.ase_molecule_formula) {
+      metaParts.push(`ASE: ${escapeHtml(meta.ase_molecule_formula)}`);
+    }
+    if (meta.pubchem_cid) {
+      metaParts.push(`CID: ${escapeHtml(meta.pubchem_cid)}`);
+    }
+    if (meta.pubchem_query) {
+      metaParts.push(`Query: ${escapeHtml(meta.pubchem_query)}`);
+    }
+    previewMeta.innerHTML = metaParts.join(" | ");
+
+    const elementCounts = data.element_counts || {};
+    const elementSummary = Object.keys(elementCounts)
+      .map((symbol) => `${escapeHtml(symbol)}=${escapeHtml(elementCounts[symbol])}`)
+      .join(", ");
+    previewElements.innerHTML = `<strong>Element counts:</strong> ${elementSummary || "n/a"}`;
+
+    const rows = (data.atoms || []).map((atom) => {
+      return `
+        <tr>
+          <td style="padding:6px;border-bottom:1px solid #f1f5f9;">${escapeHtml(atom.index)}</td>
+          <td style="padding:6px;border-bottom:1px solid #f1f5f9;">${escapeHtml(atom.symbol)}</td>
+          <td style="padding:6px;border-bottom:1px solid #f1f5f9;">${escapeHtml(atom.x)}</td>
+          <td style="padding:6px;border-bottom:1px solid #f1f5f9;">${escapeHtml(atom.y)}</td>
+          <td style="padding:6px;border-bottom:1px solid #f1f5f9;">${escapeHtml(atom.z)}</td>
+        </tr>`;
+    });
+    previewRows.innerHTML = rows.join("");
+
+    let xyzText = data.xyz_preview || "";
+    if (data.xyz_preview_truncated) {
+      xyzText += "\n... (truncated)";
+    }
+    previewXyz.textContent = xyzText;
+
+    if (data.atoms_truncated) {
+      setStatus("Preview loaded (atom table truncated for large structures).", false);
+    } else {
+      setStatus("Preview loaded.", false);
+    }
+
+    previewPanel.style.display = "block";
+  };
+
+  if (hpcSelect) {
+    hpcSelect.addEventListener("change", () => {
+      applyHpcPrefill();
+      refreshSlurmPresetChoices({ forceDefault: isTrh408Selected() });
+      applySelectedSlurmPreset();
+      applyRunMode();
+    });
+  }
+  if (runModeSelect) {
+    runModeSelect.addEventListener("change", () => {
+      applyRunMode();
+      scheduleCoadsorbateSymbolAutofill();
+    });
+  }
+  if (settingsProfileSelect) {
+    settingsProfileSelect.addEventListener("change", applyReferenceAdsorbateFilter);
+  }
+  if (qmBackendInput) {
+    qmBackendInput.addEventListener("change", () => {
+      applySettingsProfileBackendFilter();
+      applyReferenceAdsorbateFilter();
+      applyRunMode();
+    });
+  }
+  if (singleFinalTddftNrootsModeInput) {
+    singleFinalTddftNrootsModeInput.addEventListener("change", applyRunMode);
+  }
+  if (singleChargeTransferSpectrumInput) {
+    singleChargeTransferSpectrumInput.addEventListener("change", () => {
+      applyRunMode();
+      scheduleCoadsorbateSymbolAutofill();
+    });
+  }
+  if (workflowSelect) {
+    workflowSelect.addEventListener("change", () => {
+      applyRunMode();
+      updateNebPreflight();
+    });
+  }
+  if (nebBackendInput) {
+    nebBackendInput.addEventListener("change", () => {
+      applyNebBackendPanels();
+      applyRunMode();
+    });
+  }
+  if (slurmPresetSelect) {
+    slurmPresetSelect.addEventListener("change", () => {
+      applySelectedSlurmPreset();
+      applyRunMode();
+    });
+  }
+  if (geometrySourceSelect) {
+    geometrySourceSelect.addEventListener("change", () => {
+      applyGeometrySource();
+      scheduleCoadsorbateSymbolAutofill();
+    });
+  }
+  if (nebFinalGeometrySourceSelect) {
+    nebFinalGeometrySourceSelect.addEventListener("change", applyNebFinalGeometrySource);
+  }
+  if (nebFinalImageStrategySelect) {
+    nebFinalImageStrategySelect.addEventListener("change", () => {
+      applyNebFinalImageStrategy();
+      updateNebPreflight();
+    });
+  }
+  [
+    document.getElementById("id_neb_min_images"),
+    document.getElementById("id_neb_max_images"),
+    document.getElementById("id_neb_atom_shift_per_image_A"),
+    nebBreakBondIInput,
+    nebBreakBondJInput,
+    nebBreakBondExtensionInput,
+  ].forEach((input) => {
+    if (!input) return;
+    input.addEventListener("change", updateNebPreflight);
+    input.addEventListener("input", updateNebPreflight);
+  });
+  if (structureInput) {
+    structureInput.addEventListener("change", () => {
+      applyTrajBatchControls();
+      scheduleCoadsorbateSymbolAutofill();
+    });
+  }
+  if (trajFrameInput) {
+    trajFrameInput.addEventListener("change", scheduleCoadsorbateSymbolAutofill);
+  }
+  if (aseFormulaInput) {
+    aseFormulaInput.addEventListener("change", scheduleCoadsorbateSymbolAutofill);
+  }
+  if (pubchemCidInput) {
+    pubchemCidInput.addEventListener("change", scheduleCoadsorbateSymbolAutofill);
+  }
+  if (pubchemQueryInput) {
+    pubchemQueryInput.addEventListener("change", scheduleCoadsorbateSymbolAutofill);
+  }
+  if (sourceRunIdInput) {
+    sourceRunIdInput.addEventListener("change", scheduleCoadsorbateSymbolAutofill);
+  }
+  if (sourceArtifactIdInput) {
+    sourceArtifactIdInput.addEventListener("change", scheduleCoadsorbateSymbolAutofill);
+  }
+  if (submitAllTrajInput) {
+    submitAllTrajInput.addEventListener("change", applyTrajBatchControls);
+  }
+  if (referenceIntentSelect) {
+    referenceIntentSelect.addEventListener("change", applyReferenceIntent);
+  }
+  if (restartExtendStepsInput) {
+    restartExtendStepsInput.addEventListener("change", applyRestartExtensionControls);
+    restartExtendStepsInput.addEventListener("input", applyRestartExtensionControls);
+  }
+
+  if (previewBtn) {
+    previewBtn.addEventListener("click", async () => {
+      setStatus("Preparing structure preview...", false);
+      try {
+        const data = await postStructureTool("{% url 'job-structure-preview' %}");
+        renderPreview(data);
+      } catch (error) {
+        setStatus(error.message, true);
+      }
+    });
+  }
+
+  if (openAseBtn) {
+    openAseBtn.addEventListener("click", async () => {
+      setStatus("Launching ASE GUI...", false);
+      try {
+        const data = await postStructureTool("{% url 'job-structure-open-ase-gui' %}");
+        setStatus(data.message || "ASE GUI launch command started.", false);
+      } catch (error) {
+        setStatus(error.message, true);
+      }
+    });
+  }
+
+  applyHpcPrefill();
+  applySettingsProfileBackendFilter();
+  applyReferenceAdsorbateFilter();
+  applyWorkflowModeFilter();
+  refreshSlurmPresetChoices();
+  applySelectedSlurmPreset();
+  applyRunMode();
+  applyGeometrySource();
+  applyNebFinalImageStrategy();
+  applyNebBackendPanels();
+  applyTrajBatchControls();
+  applyReferenceIntent();
+  scheduleCoadsorbateSymbolAutofill();
+})();
+</script>
+{% endblock %}

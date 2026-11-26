@@ -1,0 +1,52 @@
+#!/bin/bash --login
+#SBATCH -n 40
+#SBATCH --mem-per-cpu=4000
+#SBATCH --tasks-per-node=40
+#SBATCH -o o.%J
+#SBATCH -e e.%J
+#SBATCH -t 0-1:00
+#SBATCH -p dev
+#SBATCH --account=<account>
+
+# Load the environment - ORDERING IMPORTANT
+# Loading the Python module overrides the LD_LIBRARY_PATH, OpenMPI paths must be retained for ORCA
+# to be able to locate "mpirun" when invoked from Python
+module purge
+module load mpi/openmpi/4.1.1
+
+LD_LIB_TEMP=$LD_LIBRARY_PATH
+
+module purge
+module load python/3.9.2
+
+LD_LIB_TEMP=$LD_LIB_TEMP:$LD_LIBRARY_PATH
+
+module purge
+module load mpi/openmpi/4.1.1
+module load python/3.9.2
+
+export LD_LIBRARY_PATH=$LD_LIB_TEMP
+
+
+# Set up the Python working environment
+# TODO: replace with files in the shared space once available
+. $HOME/cplas/bin/activate
+export PYTHONPATH=$HOME/.local/lib/python3.7/site-packages/carmm/:$PYTHONPATH
+export PYTHONPATH=$HOME/github/cplas/:$PYTHONPATH
+
+# Ensure that the job runs from the /scratch space
+export TEMP_DIRECTORY="/scratch/$USER/ORCA.$SLURM_JOB_ID"
+export HOME_DIRECTORY=$PWD
+mkdir $TEMP_DIRECTORY
+
+# this initial folder sync should exclude unnecessary files to avoid I/O overhead
+rsync -av --exclude='*.out' . $TEMP_DIRECTORY
+cd $TEMP_DIRECTORY
+
+# Run the Python job
+time python3 input.py | tee hawk.ase.orca.$SLURM_JOB_ID
+
+# Clear out the working directory after the job is completed #
+rm e.$SLURM_JOB_ID o.$SLURM_JOB_ID
+cp $TEMP_DIRECTORY/* $HOME_DIRECTORY -r
+rm $TEMP_DIRECTORY -r

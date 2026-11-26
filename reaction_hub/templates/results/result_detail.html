@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h3>Adsorption Result: {{ result.workflow_run.run_name }}</h3>
+  <p><strong>Adsorbate:</strong> {{ adsorbate_display_name }}</p>
+  <p><strong>Nanocluster:</strong> {{ result.nanocluster }}</p>
+  <p><strong>Settings:</strong> {{ result.settings_profile }}</p>
+  <p><strong>Total Energy:</strong> {{ result.total_energy_eV|floatformat:2 }} eV</p>
+  <p><strong>Reference Energy:</strong> {{ result.reference_energy_eV|floatformat:2 }} eV</p>
+  <p><strong>Adsorption Energy:</strong> {{ result.adsorption_energy_eV|floatformat:2 }} eV</p>
+  {% if has_ed_energy %}
+  <p><strong>Ed (Energy of Distortion):</strong> {{ ed_energy_eV|floatformat:2 }} eV</p>
+  {% endif %}
+  {% if has_eint_energy %}
+  <p><strong>Eint (Interaction Energy):</strong> {{ eint_energy_eV|floatformat:2 }} eV</p>
+  {% endif %}
+  <p><strong>Workflow Run:</strong> <a href="/workflows/{{ result.workflow_run.pk }}/">{{ result.workflow_run.run_name }}</a></p>
+</div>
+
+<div class="card">
+  <h3>Follow-Up Submission</h3>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <a style="display:inline-block;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;text-decoration:none;color:#0f172a;" href="{% url 'job-submit' %}?from_run={{ result.workflow_run.pk }}">Reuse Structure</a>
+    <a style="display:inline-block;padding:6px 10px;border:1px solid #1d4ed8;border-radius:6px;background:#2563eb;text-decoration:none;color:#fff;" href="{% url 'job-submit' %}?from_run={{ result.workflow_run.pk }}&mode=tddft_bond_scan">Start TDDFT Bond-Length Scan</a>
+  </div>
+  <div class="muted" style="margin-top:8px;">
+    Opens the submit page with geometry source set to this run's final structure and key settings prefilled.
+  </div>
+</div>
+
+<div class="card">
+  <h3>Reprocess</h3>
+  <form method="post" action="{% url 'result-reprocess' result.pk %}" style="margin:0;">
+    {% csrf_token %}
+    <button
+      type="submit"
+      onclick="return confirm('Reprocess this result by re-ingesting the run and recomputing adsorption energy?');"
+    >
+      Reprocess Result
+    </button>
+  </form>
+  <div class="muted" style="margin-top:8px;">
+    Useful when sync was interrupted and ingestion metadata needs to be refreshed.
+  </div>
+</div>
+
+<div class="card">
+  <h3>Structure Viewer</h3>
+  {{ structure_viewer_html|safe }}
+</div>
+
+{% if render_image_artifacts %}
+<div class="card">
+  <h3>Rendered Structure Images</h3>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;">
+    {% for artifact in render_image_artifacts %}
+    <div class="artifact-image-card" style="position:relative;border:1px solid #e2e8f0;border-radius:8px;padding:10px;background:#fff;">
+      <button
+        type="button"
+        class="result-delete-image-btn"
+        data-url="{% url 'workflow-delete-image-artifact' result.workflow_run.pk artifact.pk %}"
+        aria-label="Delete image"
+        title="Delete image"
+        style="position:absolute;top:8px;right:8px;z-index:2;width:22px;height:22px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#991b1b;font-weight:700;cursor:pointer;line-height:1;"
+      >
+        x
+      </button>
+      <div style="margin-bottom:8px;"><a href="{% url 'artifact-content' artifact.pk %}" target="_blank" rel="noopener noreferrer">{{ artifact.label }}</a></div>
+      <a href="{% url 'artifact-content' artifact.pk %}" target="_blank" rel="noopener noreferrer">
+        <img
+          src="{% url 'artifact-file' artifact.pk %}"
+          alt="{{ artifact.label }}"
+          style="width:100%;height:auto;border-radius:6px;border:1px solid #e2e8f0;"
+        />
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <h3>Computed Properties</h3>
+  <table>
+    <thead><tr><th>Name</th><th>Value</th><th>Unit</th></tr></thead>
+    <tbody>
+      {% for prop in properties %}
+      <tr>
+        <td>{{ prop.name }}</td>
+        <td>{{ prop.value_float|default:prop.value_text }}</td>
+        <td>{{ prop.unit }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="3">No computed properties.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if key_plot_artifacts %}
+<div class="card">
+  <h3>Key Workflow Plots</h3>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;">
+    {% for artifact in key_plot_artifacts %}
+    <div class="artifact-image-card" style="position:relative;border:1px solid #e2e8f0;border-radius:8px;padding:10px;background:#fff;">
+      <button
+        type="button"
+        class="result-delete-image-btn"
+        data-url="{% url 'workflow-delete-image-artifact' result.workflow_run.pk artifact.pk %}"
+        aria-label="Delete image"
+        title="Delete image"
+        style="position:absolute;top:8px;right:8px;z-index:2;width:22px;height:22px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#991b1b;font-weight:700;cursor:pointer;line-height:1;"
+      >
+        x
+      </button>
+      <div style="margin-bottom:8px;"><a href="{% url 'artifact-content' artifact.pk %}" target="_blank" rel="noopener noreferrer">{{ artifact.label }}</a></div>
+      <a href="{% url 'artifact-content' artifact.pk %}" target="_blank" rel="noopener noreferrer">
+        <img
+          src="{% url 'artifact-file' artifact.pk %}"
+          alt="{{ artifact.label }}"
+          style="width:100%;height:auto;border-radius:6px;border:1px solid #e2e8f0;"
+        />
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <h3>Artifacts</h3>
+  <div style="display:none;">{% csrf_token %}</div>
+  <div class="muted" id="result-ase-status" style="margin-bottom:8px;"></div>
+  <table>
+    <thead><tr><th>Label</th><th>Kind</th><th>Path</th><th>Action</th></tr></thead>
+    <tbody>
+      {% for artifact in artifacts %}
+      <tr>
+        <td>
+          <a href="{% url 'artifact-content' artifact.pk %}" target="_blank" rel="noopener noreferrer">{{ artifact.label }}</a>
+          {% if artifact.metadata.remote_only %}
+          <span class="artifact-badge artifact-badge-hpc-only">HPC only</span>
+          {% elif artifact.metadata.remote_path and not artifact.metadata.local_cache_path %}
+          <span class="artifact-badge artifact-badge-hpc-ref">HPC path reference</span>
+          {% elif artifact.metadata.source == "remote_summary" and not artifact.metadata.local_cache_path %}
+          <span class="artifact-badge artifact-badge-hpc-ref">HPC path reference</span>
+          {% elif artifact.metadata.local_cache_path or artifact.metadata.downloaded_from_hpc %}
+          <span class="artifact-badge artifact-badge-downloaded">Downloaded copy</span>
+          {% else %}
+          <span class="artifact-badge artifact-badge-local">Local file</span>
+          {% endif %}
+        </td>
+        <td>{{ artifact.kind }}</td>
+        <td>
+          {{ artifact.path }}
+          {% if artifact.metadata.remote_path %}
+          <div class="muted" style="margin-top:4px;">HPC: {{ artifact.metadata.remote_path }}</div>
+          {% endif %}
+        </td>
+        <td>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+            <a href="{% url 'artifact-content' artifact.pk %}" target="_blank" rel="noopener noreferrer">Inspect</a>
+            {% if artifact.pk in content_available_artifact_ids %}
+            <a href="{% url 'artifact-file' artifact.pk %}?download=1">Download</a>
+            {% endif %}
+            {% if artifact.metadata.remote_only or artifact.pk not in content_available_artifact_ids and artifact.metadata.remote_path or artifact.pk not in content_available_artifact_ids and artifact.metadata.source == "remote_summary" %}
+            <button
+              type="button"
+              class="result-ingest-btn"
+              data-url="{% url 'artifact-ingest' artifact.pk %}"
+              data-label="{{ artifact.label }}"
+              style="padding:2px 8px;font-size:0.8rem;background:#eff6ff;border:1px solid #93c5fd;color:#1d4ed8;border-radius:4px;cursor:pointer;"
+            >
+              Ingest
+            </button>
+            {% endif %}
+            {% if artifact.pk in ase_openable_artifact_ids %}
+            <button
+              type="button"
+              class="result-open-ase-btn"
+              data-url="{% url 'workflow-open-artifact-ase-gui' result.workflow_run.pk artifact.pk %}"
+            >
+              Open in ASE GUI
+            </button>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4">No artifacts linked.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<script>
+(() => {
+  const statusEl = document.getElementById("result-ase-status");
+  const buttons = Array.from(document.querySelectorAll(".result-open-ase-btn"));
+  const deleteButtons = Array.from(document.querySelectorAll(".result-delete-image-btn"));
+  const csrfInput = document.querySelector("input[name=csrfmiddlewaretoken]");
+  let csrfToken = csrfInput ? csrfInput.value : "";
+  if (!csrfToken) {
+    const cookieEntry = document.cookie
+      .split(";")
+      .map((entry) => entry.trim())
+      .find((entry) => entry.startsWith("csrftoken="));
+    csrfToken = cookieEntry ? cookieEntry.slice("csrftoken=".length) : "";
+  }
+
+  const setStatus = (message, isError) => {
+    if (!statusEl) return;
+    statusEl.style.color = isError ? "#b91c1c" : "#0f172a";
+    statusEl.textContent = message;
+  };
+
+  for (const button of buttons) {
+    button.addEventListener("click", async () => {
+      const url = button.dataset.url || "";
+      if (!url) return;
+      button.disabled = true;
+      setStatus("Launching ASE GUI...", false);
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: csrfToken ? { "X-CSRFToken": csrfToken } : {},
+          credentials: "same-origin",
+        });
+        const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+        const payload = contentType.includes("application/json")
+          ? await response.json()
+          : { ok: false, error: (await response.text()).slice(0, 300) || "Unexpected response." };
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.error || "ASE GUI launch failed.");
+        }
+        setStatus(payload.message || "ASE GUI launch command started.", false);
+      } catch (error) {
+        setStatus(error.message || "ASE GUI launch failed.", true);
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+
+  for (const button of deleteButtons) {
+    button.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const url = button.dataset.url || "";
+      if (!url) return;
+      const confirmed = window.confirm("Delete this image artifact?");
+      if (!confirmed) return;
+      button.disabled = true;
+      setStatus("Deleting image artifact...", false);
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: csrfToken ? { "X-CSRFToken": csrfToken } : {},
+          credentials: "same-origin",
+        });
+        const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+        const payload = contentType.includes("application/json")
+          ? await response.json()
+          : { ok: false, error: (await response.text()).slice(0, 300) || "Unexpected response." };
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.error || "Image deletion failed.");
+        }
+        setStatus(payload.message || "Image deleted.", false);
+        window.setTimeout(() => window.location.reload(), 250);
+      } catch (error) {
+        setStatus(error.message || "Image deletion failed.", true);
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+
+  const ingestButtons = Array.from(document.querySelectorAll(".result-ingest-btn"));
+  for (const button of ingestButtons) {
+    button.addEventListener("click", async () => {
+      const url = button.dataset.url || "";
+      const label = button.dataset.label || "artifact";
+      if (!url) return;
+      button.disabled = true;
+      const originalText = button.textContent;
+      button.textContent = "Ingesting...";
+      setStatus(`Ingesting ${label} via Celery...`, false);
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: csrfToken ? { "X-CSRFToken": csrfToken } : {},
+          credentials: "same-origin",
+        });
+        const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+        const payload = contentType.includes("application/json")
+          ? await response.json()
+          : { ok: false, error: (await response.text()).slice(0, 300) || "Unexpected response." };
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.error || "Ingest failed.");
+        }
+        setStatus(payload.message || `Ingested ${label} successfully.`, false);
+        window.setTimeout(() => window.location.reload(), 500);
+      } catch (error) {
+        setStatus(error.message || "Ingest failed.", true);
+        button.disabled = false;
+        button.textContent = originalText;
+      }
+    });
+  }
+})();
+</script>
+{% endblock %}

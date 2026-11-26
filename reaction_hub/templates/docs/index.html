@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+  <h3 style="margin-top:0;">Documentation</h3>
+  <p class="muted">Browse markdown docs stored in <code>{{ docs_root }}</code>.</p>
+</div>
+
+<div class="card">
+  {% if docs %}
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Title</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for doc in docs %}
+          <tr>
+            <td><a href="{% url 'docs-detail' doc.path %}">{{ doc.path }}</a></td>
+            <td>{{ doc.title }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="muted" style="margin:0;">No markdown documents found.</p>
+  {% endif %}
+</div>
+{% endblock %}

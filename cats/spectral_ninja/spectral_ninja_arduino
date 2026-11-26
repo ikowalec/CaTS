@@ -1,0 +1,23 @@
+const int buttonPin = 4;
+bool buttonPressed = false;
+
+void setup() {
+  pinMode(buttonPin, INPUT_PULLUP);
+  Serial.begin(9600);
+  delay(1000);  // brief pause to let USB settle
+}
+
+void loop() {
+  int state = digitalRead(buttonPin);
+
+  // Send "CLICK" once per press (no repeats while held)
+  if (state == LOW && !buttonPressed) {
+    Serial.println("CLICK");
+    buttonPressed = true;
+  } 
+  else if (state == HIGH) {
+    buttonPressed = false;
+  }
+
+  delay(5);
+}

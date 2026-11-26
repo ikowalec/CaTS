@@ -1,0 +1,42 @@
+#!/bin/bash --login
+
+# Example Slurm submission template for Reaction Hub-compatible workflows.
+# Fill placeholders before use.
+
+#SBATCH --job-name={{ job_name }}
+#SBATCH --nodes={{ nodes }}
+#SBATCH --tasks-per-node={{ tasks_per_node }}
+#SBATCH --cpus-per-task={{ cpus_per_task }}
+#SBATCH --time={{ walltime }}
+#SBATCH --account={{ account }}
+#SBATCH --partition={{ partition }}
+#SBATCH --qos={{ qos }}
+
+set -euo pipefail
+
+module purge
+module load {{ module_1 }}
+module load {{ module_2 }}
+module load {{ module_3 }}
+
+# Optional virtual environment activation
+# source {{ venv_activate_path }}
+
+PERSISTENT_RUN_DIR="{{ persistent_run_dir }}"
+SCRATCH_RUN_DIR="{{ scratch_base }}/$USER/$SLURM_JOB_ID"
+WORKFLOW_ENTRYPOINT="{{ workflow_entrypoint }}"
+WORKFLOW_ARGS="{{ workflow_args }}"
+
+mkdir -p "$SCRATCH_RUN_DIR"
+rsync -a "$PERSISTENT_RUN_DIR/" "$SCRATCH_RUN_DIR/"
+
+cd "$SCRATCH_RUN_DIR"
+python -u "$WORKFLOW_ENTRYPOINT" $WORKFLOW_ARGS
+exit_code=$?
+
+mkdir -p "$PERSISTENT_RUN_DIR"
+rsync -a "$SCRATCH_RUN_DIR/" "$PERSISTENT_RUN_DIR/"
+
+# Keep workflow marker files copied from scratch to /work.
+# Reaction Hub ingestion should target the persistent /work tree.
+exit "$exit_code"

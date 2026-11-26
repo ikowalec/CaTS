@@ -1,0 +1,8 @@
+{
+  "id": "example",
+  "to": "gemini",
+  "request": "Review the handoff instructions for missing steps. Write findings to the result file.",
+  "context": [
+    ".agents/orchestrator/README.md"
+  ]
+}

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h3>Artifact Content: {{ artifact.label }}</h3>
+  <p><strong>Run:</strong> <a href="/workflows/{{ artifact.workflow_run.pk }}/">{{ artifact.workflow_run.run_name }}</a></p>
+  <p><strong>Kind:</strong> {{ artifact.kind }}</p>
+  <p><strong>Path:</strong> {{ artifact.path }}</p>
+  <p><strong>Resolved Path:</strong> {{ artifact_path }}</p>
+  {% if remote_path %}
+  <p><strong>HPC Path:</strong> {{ remote_path }}</p>
+  {% endif %}
+  {% if remote_only %}
+  <p><strong>Availability:</strong> Retained on HPC only (no local preview/download).</p>
+  {% elif content_available %}
+  <p><strong>Content Type:</strong> {{ content_type }}</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <a href="{{ file_url }}" target="_blank" rel="noopener noreferrer">Open Raw File</a>
+    <a href="{{ download_url }}">Download File</a>
+  </div>
+  {% else %}
+  <p><strong>Availability:</strong> Local file not found.</p>
+  {% endif %}
+  {% if remote_only or not content_available and remote_path or not content_available and artifact.workflow_run %}
+  <div style="margin-top:12px;">
+    <button
+      type="button"
+      id="ingest-artifact-btn"
+      class="button"
+      style="padding:6px 12px;background:#eff6ff;border:1px solid #93c5fd;color:#1d4ed8;border-radius:6px;cursor:pointer;font-size:0.875rem;"
+      data-url="{% url 'artifact-ingest' artifact.pk %}"
+    >
+      Ingest from HPC
+    </button>
+    <span id="ingest-status" class="muted" style="margin-left:8px;"></span>
+  </div>
+  {% endif %}
+</div>
+
+{% if content_available and is_image %}
+<div class="card">
+  <h3>Image Preview</h3>
+  <img src="{{ file_url }}" alt="{{ artifact.label }}" style="max-width:100%;height:auto;border:1px solid #e2e8f0;border-radius:8px;" />
+</div>
+{% elif content_available and text_preview %}
+<div class="card">
+  <h3>Text Preview{% if text_preview_truncated %} (truncated){% endif %}</h3>
+  <pre style="white-space:pre-wrap;overflow:auto;max-height:70vh;border:1px solid #e2e8f0;border-radius:8px;padding:12px;background:#f8fafc;">{{ text_preview }}</pre>
+</div>
+{% elif content_available %}
+<div class="card">
+  <h3>Preview</h3>
+  <p>Inline preview is not available for this file type. Use <strong>Open Raw File</strong> or <strong>Download File</strong>.</p>
+</div>
+{% endif %}
+<script>
+(() => {
+  const btn = document.getElementById("ingest-artifact-btn");
+  const status = document.getElementById("ingest-status");
+  if (!btn) return;
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    const orig = btn.innerText;
+    btn.innerText = "Ingesting...";
+    if (status) status.innerText = "Ingesting via Celery...";
+    let csrfToken = "";
+    const cookieEntry = document.cookie.split(";").map(e => e.trim()).find(e => e.startsWith("csrftoken="));
+    if (cookieEntry) csrfToken = cookieEntry.slice("csrftoken=".length);
+    try {
+      const res = await fetch(btn.dataset.url, {
+        method: "POST",
+        headers: csrfToken ? { "X-CSRFToken": csrfToken } : {},
+        credentials: "same-origin"
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || "Ingest failed.");
+      if (status) status.innerText = data.message || "Ingested successfully.";
+      window.setTimeout(() => window.location.reload(), 500);
+    } catch (e) {
+      if (status) status.innerText = "Error: " + (e.message || e);
+      btn.disabled = false;
+      btn.innerText = orig;
+    }
+  });
+})();
+</script>
+{% endblock %}

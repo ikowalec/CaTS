@@ -1,0 +1,2 @@
+# Optional PostgreSQL backend; not installed in the inspected SQLite venv.
+psycopg[binary]>=3.3,<3.4

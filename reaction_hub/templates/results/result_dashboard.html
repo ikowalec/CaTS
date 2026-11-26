@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h3>Adsorption Dashboard</h3>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <a href="{% url 'result-list' %}">Back to Results List</a>
+    <a href="{% url 'result-dashboard-export-csv' %}?limit={{ dashboard_limit }}">Download Dashboard CSV</a>
+    <form method="post" action="{% url 'result-recompute-adsorption' %}" style="display:inline-flex;gap:6px;align-items:center;margin:0;">
+      {% csrf_token %}
+      <button type="submit">Recompute Eads From References</button>
+    </form>
+  </div>
+  <form method="get" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;">
+    <label for="dashboard-limit">Rows to load</label>
+    <input id="dashboard-limit" type="number" name="limit" min="1" max="20000" value="{{ dashboard_limit }}" />
+    <button type="submit">Refresh</button>
+  </form>
+  <div class="grid">
+    <div class="metric"><span class="muted">Completed System Runs</span><strong>{{ dashboard.total_system_runs }}</strong></div>
+    <div class="metric"><span class="muted">Formula Matches</span><strong>{{ dashboard.matched_candidates }}</strong></div>
+    <div class="metric"><span class="muted">Computed Eads</span><strong>{{ dashboard.computed_results }}</strong></div>
+    <div class="metric"><span class="muted">Rows Loaded</span><strong>{{ dashboard.rows|length }}</strong></div>
+  </div>
+  <div style="margin-top:12px; overflow-x:auto;">
+    <table>
+      <thead>
+        <tr>
+          <th>Run</th>
+          <th>Settings</th>
+          <th>Formula</th>
+          <th>Nanocluster</th>
+          <th>Adsorbate</th>
+          <th>Eref (eV)</th>
+          <th>Eads (eV)</th>
+          <th>Ed (eV)</th>
+          <th>Eint (eV)</th>
+          <th>Ea scan (eV)</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in dashboard.rows %}
+        <tr>
+          <td><a href="/workflows/{{ row.run_id }}/">{{ row.run_name }}</a></td>
+          <td>{{ row.settings_profile }}</td>
+          <td>{{ row.system_formula }}</td>
+          <td>{{ row.nanocluster_name }}</td>
+          <td>{{ row.adsorbate_name }}</td>
+          <td>{{ row.reference_energy_eV|floatformat:2|default:"-" }}</td>
+          <td>
+            {% if row.result_id %}
+              <a href="/results/energy/{{ row.result_id }}/">{{ row.adsorption_energy_eV|floatformat:2|default:"-" }}</a>
+            {% else %}
+              {{ row.adsorption_energy_eV|floatformat:2|default:"-" }}
+            {% endif %}
+          </td>
+          <td>{{ row.ed_energy_eV|floatformat:2|default:"-" }}</td>
+          <td>{{ row.eint_energy_eV|floatformat:2|default:"-" }}</td>
+          <td>{{ row.bond_scan_activation_barrier_eV|floatformat:2|default:"-" }}</td>
+          <td>{{ row.status }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="11">No completed system runs found yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

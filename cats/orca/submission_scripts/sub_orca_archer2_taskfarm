@@ -1,0 +1,102 @@
+#!/bin/bash --login
+
+#SBATCH --job-name=ase_orca
+#SBATCH --nodes=4
+#SBATCH --tasks-per-node=128
+#SBATCH --cpus-per-task=1
+#SBATCH --array=0-2
+#SBATCH --time=24:0:0
+
+#SBATCH --account=<account>
+#SBATCH --partition=standard
+#SBATCH --qos=standard
+
+module load epcc-setup-env
+module load cray-python
+module load other-software
+module load orca/6.0.0
+
+. /work/<project>/<group>/<user>/ORCA/cplas_venv/bin/activate
+PYTHONPATH=/work/<project>/<group>/<user>/ORCA/cplas:$PYTHONPATH
+PYTHONPATH=/work/<project>/<group>/<user>/ORCA/ase:$PYTHONPATH
+PYTHONPATH=/work/<project>/<group>/<user>/ORCA/carmm:$PYTHONPATH
+
+export SLURM_CPU_FREQ_REQ=2250000
+export OMP_NUM_THREADS=1
+
+python_input="batch_optimise.py $SLURM_ARRAY_TASK_ID"
+
+export TEMP_DIRECTORY="/mnt/lustre/a2fs-nvme/work/<project>/<group>/$USER/$SLURM_JOB_ID"
+export HOME_DIRECTORY=$PWD
+mkdir $TEMP_DIRECTORY
+
+rsync -av --exclude="configuration_info.csv" . $TEMP_DIRECTORY
+cd $TEMP_DIRECTORY
+
+# Get the remaining time from squeue (formats: days-hours:minutes:seconds, hours:minutes:seconds, or minutes:seconds)
+remaining_time=$(squeue -h -j $SLURM_JOB_ID -o "%L")
+
+# Initialize variables
+days=0
+hours=0
+minutes=0
+seconds=0
+
+# Check if the time format includes a dash (days-hours:minutes:seconds)
+if [[ "$remaining_time" == *-* ]]; then
+    # Split into days and time (hours:minutes:seconds)
+    IFS='-' read -r days time_part <<< "$remaining_time"
+else
+    # If no dash, assume no days
+    time_part=$remaining_time
+fi
+
+# Now check if time_part is in hours:minutes:seconds or minutes:seconds format
+IFS=':' read -r -a TIME_PARTS <<< "$time_part"
+
+# If there are three parts, it's hours:minutes:seconds
+if [ ${#TIME_PARTS[@]} -eq 3 ]; then
+    hours=${TIME_PARTS[0]}
+    minutes=${TIME_PARTS[1]}
+    seconds=${TIME_PARTS[2]}
+
+# If there are two parts, it's minutes:seconds
+elif [ ${#TIME_PARTS[@]} -eq 2 ]; then
+    minutes=${TIME_PARTS[0]}
+    seconds=${TIME_PARTS[1]}
+fi
+
+# Convert everything to seconds
+time_limit_seconds=$((days * 86400 + hours * 3600 + minutes * 60 + seconds))
+
+# Output time in seconds (for debugging)
+echo "Remaining time in seconds: $time_limit_seconds"
+
+# Calculate the sleep duration (time limit minus 1 minute)
+sleep_duration=$((time_limit_seconds - 60))
+
+# Ensure sleep duration is non-negative
+if [ "$sleep_duration" -lt 0 ]; then
+  sleep_duration=0
+fi
+
+# Run the Python job
+export output=test.log.$SLURM_JOB_ID
+time python3 -u $python_input > $output &
+job_pid=$!
+
+# Sleep for the calculated duration, but allow for early termination if job finishes
+(
+    sleep ${sleep_duration}s
+    kill -0 $job_pid 2>/dev/null && kill $job_pid  # Kill the job if it's still running
+) &
+
+wait $job_pid  # Wait for the main job to finish
+
+# Cleanup task
+echo "Starting cleanup..."
+# rsync -av --exclude='*.tmp' --exclude='*.bas' --exclude="slurm*" $TEMP_DIRECTORY/ $HOME_DIRECTORY/
+cp $TEMP_DIRECTORY/$output $HOME_DIRECTORY
+# rm -r $TEMP_DIRECTORY
+echo "Cleanup completed."
+

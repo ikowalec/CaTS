@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reaction Hub</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; background: #f6f8fb; color: #1f2937; }
+    header { background: #0f172a; color: white; padding: 12px 20px; }
+    nav a { color: #cbd5e1; margin-right: 12px; text-decoration: none; }
+    nav a:hover { color: #ffffff; }
+    .container { margin: 20px 0; padding: 0 16px; }
+    .card { background: white; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.08); padding: 16px; margin-bottom: 16px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+    .metric { background: #eef2ff; border-radius: 6px; padding: 12px; }
+    .metric strong { display: block; font-size: 1.4rem; }
+    .table-container { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #e5e7eb; text-align: left; padding: 8px; }
+    .pagination {
+      list-style: none;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin: 14px 0 4px 0;
+      padding: 0;
+    }
+    .pagination li { display: inline-flex; }
+    .pagination a,
+    .pagination span {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 36px;
+      height: 34px;
+      padding: 0 12px;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      background: #ffffff;
+      color: #0f172a;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.92rem;
+      line-height: 1;
+    }
+    .pagination li.active a,
+    .pagination li.active span {
+      background: #2563eb;
+      border-color: #1d4ed8;
+      color: #ffffff;
+    }
+    .pagination li.disabled a,
+    .pagination li.disabled span {
+      color: #9ca3af;
+      background: #f8fafc;
+      border-color: #e5e7eb;
+      cursor: not-allowed;
+    }
+    .pagination li:not(.active):not(.disabled) a:hover {
+      background: #eff6ff;
+      border-color: #93c5fd;
+      color: #1d4ed8;
+    }
+    .pagination a[href="#"] {
+      background: #f8fafc;
+      border-style: dashed;
+      color: #64748b;
+      pointer-events: none;
+      cursor: default;
+    }
+    @media (max-width: 700px) {
+      .pagination a,
+      .pagination span {
+        min-width: 32px;
+        height: 32px;
+        padding: 0 9px;
+        font-size: 0.86rem;
+      }
+    }
+    .status-running { color: #0f766e; }
+    .status-completed { color: #15803d; }
+    .status-failed, .status-cancelled { color: #b91c1c; }
+    .status-deleted { color: #9a3412; font-weight: 600; }
+    .artifact-badge { display: inline-block; font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; font-weight: 600; margin-left: 6px; }
+    .artifact-badge-hpc-only { color: #7f1d1d; background: #fee2e2; border: 1px solid #fecaca; }
+    .artifact-badge-hpc-ref { color: #9a3412; background: #ffedd5; border: 1px solid #fed7aa; }
+    .artifact-badge-downloaded { color: #075985; background: #e0f2fe; border: 1px solid #bae6fd; }
+    .artifact-badge-local { color: #14532d; background: #dcfce7; border: 1px solid #bbf7d0; }
+    .muted { color: #6b7280; }
+    .form-row { margin-bottom: 8px; }
+    input, select { padding: 4px 8px; }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+<header>
+  <h2 style="margin:0 0 8px 0;">Reaction Hub</h2>
+  <nav>
+    <a href="/">Dashboard</a>
+    <a href="/campaigns/">Campaigns</a>
+    <a href="/jobs/">Jobs</a>
+    <a href="/jobs/submit/">Submit Job</a>
+    <a href="/workflows/">Workflow Runs</a>
+    <a href="/results/">Results</a>
+    <a href="/docs/">Docs</a>
+    <a href="/api/">API</a>
+    <a href="/admin/">Admin</a>
+  </nav>
+</header>
+<main class="container">
+  {% if messages %}
+    {% for message in messages %}
+      <div class="card" style="border-left:4px solid #2563eb;">
+        {{ message }}
+      </div>
+    {% endfor %}
+  {% endif %}
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

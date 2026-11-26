@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h3>Energy Dataset Checkout</h3>
+  <p class="muted">Temporary dataset from selected workflow runs. Sort here, remove rows, or export CSV.</p>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    <a href="{% url 'result-run-energies' %}">Add More Runs</a>
+    <a href="{% url 'result-energy-basket-export-csv' %}?{{ dataset_query }}">Export CSV</a>
+  </div>
+</div>
+
+<div class="card">
+  <form method="get">
+    <input type="hidden" name="sort" value="{{ sort }}" />
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+      <label>Element A <input name="element_a" value="{{ filters.element_a }}" size="4" placeholder="Cu" /></label>
+      <label>Min % <input type="number" name="element_a_min" value="{{ filters.element_a_min }}" min="0" max="100" step="any" /></label>
+      <label>Max % <input type="number" name="element_a_max" value="{{ filters.element_a_max }}" min="0" max="100" step="any" /></label>
+      <label>Element B <input name="element_b" value="{{ filters.element_b }}" size="4" placeholder="N" /></label>
+      <label>Min % <input type="number" name="element_b_min" value="{{ filters.element_b_min }}" min="0" max="100" step="any" /></label>
+      <label>Max % <input type="number" name="element_b_max" value="{{ filters.element_b_max }}" min="0" max="100" step="any" /></label>
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+      {% for column in column_options %}
+      <label>
+        <input type="checkbox" name="columns" value="{{ column.key }}" {% if column.selected %}checked{% endif %} />
+        {{ column.label }}
+      </label>
+      {% endfor %}
+    </div>
+    <button type="submit" style="margin-top:10px;">Update Columns</button>
+  </form>
+</div>
+
+<div class="card">
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="sort" value="{{ sort }}" />
+    {% for column in columns %}
+    <input type="hidden" name="columns" value="{{ column }}" />
+    {% endfor %}
+    {% for key, value in filters.items %}
+      {% if value %}<input type="hidden" name="{{ key }}" value="{{ value }}" />{% endif %}
+    {% endfor %}
+    <button type="submit">Remove Selected</button>
+    <button type="submit" name="action" value="clear">Clear Dataset</button>
+    <div class="table-container" style="margin-top:10px;">
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            {% for column in column_options %}
+              {% if column.selected %}
+                <th><a href="?{{ column_query }}&sort={{ column.sort }}">{{ column.label }}</a></th>
+              {% endif %}
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for prop in rows %}
+          <tr>
+            <td><input type="checkbox" name="run_ids" value="{{ prop.workflow_run_id }}" /></td>
+            {% for cell in prop.energy_dataset_cells %}
+              {% if cell.key == "run_name" %}
+              <td><a href="{% url 'workflow-run-detail' prop.workflow_run_id %}">{{ cell.value }}</a></td>
+              {% else %}
+              <td>{{ cell.value|default:"-" }}</td>
+              {% endif %}
+            {% endfor %}
+          </tr>
+          {% empty %}
+          <tr><td colspan="{{ columns|length|add:1 }}" class="muted">Dataset is empty.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </form>
+</div>
+{% endblock %}

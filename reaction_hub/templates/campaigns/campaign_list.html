@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<style>
+  .campaign-hero {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+    color: #ffffff;
+    border-radius: 14px;
+    padding: 28px 32px;
+    margin-bottom: 24px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .hero-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-top: 20px;
+  }
+  .hero-stat-card {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    padding: 14px 18px;
+    backdrop-filter: blur(8px);
+  }
+  .hero-stat-label {
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #94a3b8;
+    margin-bottom: 4px;
+  }
+  .hero-stat-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #60a5fa;
+  }
+  .campaigns-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 20px;
+    margin-bottom: 28px;
+  }
+  .campaign-summary-card {
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.04);
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: all 0.25s ease;
+  }
+  .campaign-summary-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 24px rgba(0,0,0,0.08);
+    border-color: #93c5fd;
+  }
+  .status-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .status-active { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+  .status-paused { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+  .status-completed { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+  .progress-track {
+    background: #e2e8f0;
+    border-radius: 8px;
+    height: 10px;
+    width: 100%;
+    overflow: hidden;
+    margin: 12px 0 6px 0;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 8px;
+    background: linear-gradient(90deg, #3b82f6 0%, #10b981 100%);
+    transition: width 0.5s ease;
+  }
+  .tag-pill {
+    display: inline-block;
+    background: #f1f5f9;
+    color: #475569;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.76rem;
+    font-weight: 600;
+    border: 1px solid #e2e8f0;
+    margin-right: 4px;
+    margin-bottom: 4px;
+  }
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: #2563eb;
+    color: #ffffff;
+    padding: 8px 16px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.88rem;
+    transition: all 0.2s ease;
+  }
+  .btn-primary:hover {
+    background: #1d4ed8;
+    color: #ffffff;
+  }
+  .metric-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 10px 12px;
+    text-align: center;
+  }
+  .metric-box-num {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #0f172a;
+  }
+  .metric-box-lbl {
+    font-size: 0.72rem;
+    color: #64748b;
+    text-transform: uppercase;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Hero Header -->
+<div class="campaign-hero">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;">
+    <div>
+      <span style="background:rgba(59,130,246,0.2);color:#93c5fd;border:1px solid rgba(59,130,246,0.4);padding:4px 12px;border-radius:999px;font-size:0.8rem;font-weight:600;">
+        🔬 High-Throughput Computational Research
+      </span>
+      <h1 style="margin:10px 0 6px 0;font-size:1.8rem;font-weight:800;letter-spacing:-0.02em;">
+        Reaction Hub Research Campaigns
+      </h1>
+      <p style="margin:0;color:#cbd5e1;font-size:0.94rem;max-width:700px;line-height:1.5;">
+        Multi-stage active learning screening, reaction pathway exploration, and plasmonic optical spectra calculations across target nanocluster architectures.
+      </p>
+    </div>
+    
+    <div style="background:rgba(15,23,42,0.6);border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:12px 18px;text-align:right;">
+      <div style="font-size:0.75rem;color:#94a3b8;text-transform:uppercase;">Active Slurm Reservation</div>
+      <div style="font-size:1.05rem;font-weight:700;color:#60a5fa;margin-top:2px;">{{ reservation_name }}</div>
+      <div style="font-size:0.8rem;color:#10b981;font-weight:600;margin-top:2px;">⚡ {{ reservation_nodes }} Nodes (12,800 Cores)</div>
+    </div>
+  </div>
+
+  <!-- Hero Top Stats -->
+  <div class="hero-stats-grid">
+    <div class="hero-stat-card">
+      <div class="hero-stat-label">Active Campaigns</div>
+      <div class="hero-stat-value" style="color:#60a5fa;">{{ total_campaigns }}</div>
+    </div>
+    <div class="hero-stat-card">
+      <div class="hero-stat-label">Total Campaign Runs</div>
+      <div class="hero-stat-value" style="color:#ffffff;">{{ total_campaign_runs }}</div>
+    </div>
+    <div class="hero-stat-card">
+      <div class="hero-stat-label">Completed Calculations</div>
+      <div class="hero-stat-value" style="color:#10b981;">{{ total_completed_runs }}</div>
+    </div>
+    <div class="hero-stat-card">
+      <div class="hero-stat-label">Overall Completion Rate</div>
+      <div class="hero-stat-value" style="color:#f59e0b;">{{ overall_progress_pct }}%</div>
+    </div>
+  </div>
+</div>
+
+<!-- Campaign Cards Grid -->
+<div class="campaigns-grid">
+  {% for item in campaigns_data %}
+  <div class="campaign-summary-card">
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
+        <h3 style="margin:0;font-size:1.15rem;font-weight:700;color:#0f172a;line-height:1.3;">
+          <a href="{% url 'campaign-detail' slug=item.campaign.slug %}" style="color:#0f172a;text-decoration:none;">
+            {{ item.campaign.name }}
+          </a>
+        </h3>
+        <span class="status-badge status-{{ item.campaign.status }}">
+          {{ item.campaign.status }}
+        </span>
+      </div>
+
+      <p style="margin:0 0 14px 0;font-size:0.86rem;color:#64748b;line-height:1.45;">
+        {{ item.campaign.description|default:"Plasmonic catalysis and reaction pathway exploration campaign."|truncatechars:130 }}
+      </p>
+
+      <!-- Target Cluster Tags -->
+      <div style="margin-bottom:14px;">
+        <div style="font-size:0.72rem;text-transform:uppercase;color:#94a3b8;font-weight:600;margin-bottom:4px;">Target Clusters:</div>
+        {% for cl in item.clusters %}
+          <span class="tag-pill">{{ cl }}</span>
+        {% empty %}
+          <span class="tag-pill">All Systems</span>
+        {% endfor %}
+      </div>
+
+      <!-- Stage Progress -->
+      <div style="margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;font-size:0.82rem;font-weight:600;">
+          <span style="color:#334155;">Ledger Progress</span>
+          <span style="color:#2563eb;">{{ item.completed_stages }} / {{ item.total_stages }} Stages ({{ item.progress_pct }}%)</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" style="width: {{ item.progress_pct }}%;"></div>
+        </div>
+      </div>
+
+      <!-- Quick Metrics Grid -->
+      <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:8px;margin-bottom:18px;">
+        <div class="metric-box">
+          <div class="metric-box-num" style="color:#15803d;">{{ item.completed_runs }}</div>
+          <div class="metric-box-lbl">Done</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-box-num" style="color:#0284c7;">{{ item.running_runs }}</div>
+          <div class="metric-box-lbl">Running</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-box-num" style="color:#b91c1c;">{{ item.failed_runs }}</div>
+          <div class="metric-box-lbl">Failed</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-box-num">{{ item.total_runs }}</div>
+          <div class="metric-box-lbl">Total</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #f1f5f9;padding-top:14px;">
+      <span style="font-size:0.8rem;color:#64748b;">
+        Quota: <strong>{{ item.campaign.max_nodes_quota }} CPU nodes</strong> / <strong>{{ item.campaign.gpu_concurrency_limit }} GPU</strong>
+      </span>
+      <a href="{% url 'campaign-detail' slug=item.campaign.slug %}" class="btn-primary">
+        View Summary →
+      </a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

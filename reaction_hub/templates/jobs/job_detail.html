@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h3>Job {{ job.scheduler_job_id }}</h3>
+  <p><strong>Name:</strong> {{ job.job_name }}</p>
+  <p><strong>Status:</strong> <span class="status-{{ job.status }}">{{ job.status }}</span></p>
+  <p><strong>Workflow Run:</strong> <a href="/workflows/{{ job.workflow_run.pk }}/">{{ job.workflow_run.run_name }}</a></p>
+  <p><strong>HPC System:</strong> {{ job.hpc_system|default:"-" }}</p>
+  <p><strong>Remote Workdir:</strong> {{ job.remote_workdir|default:"-" }}</p>
+  <p><strong>Submitted:</strong> {{ job.submitted_at|default:"-" }}</p>
+  <p><strong>Started:</strong> {{ job.started_at|default:"-" }}</p>
+  <p><strong>Completed:</strong> {{ job.completed_at|default:"-" }}</p>
+  <p><strong>Exit Code:</strong> {{ job.exit_code|default:"-" }}</p>
+</div>
+
+<div class="card">
+  <h3>Actions</h3>
+  {% if job.status == "initiated" or job.status == "pending" or job.status == "running" %}
+  <form method="post" action="{% url 'job-scancel-delete' job.pk %}" style="margin:0;">
+    {% csrf_token %}
+    <button
+      type="submit"
+      onclick="return confirm('Scancel this job and rename remote run folder to *_to_delete?');"
+    >
+      Scancel + Delete
+    </button>
+  </form>
+  {% elif job.status == "cancelled" %}
+  <form method="post" action="{% url 'job-restart-cancelled' job.pk %}" style="margin:0;">
+    {% csrf_token %}
+    <button
+      type="submit"
+      onclick="return confirm('Restart this cancelled job from the same run folder and submit a new scheduler job?');"
+    >
+      Restart In Place
+    </button>
+  </form>
+  {% elif job.status == "failed" %}
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <form method="post" action="{% url 'job-resubmit-failed' job.pk %}" style="margin:0;">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}" />
+      <button
+        type="submit"
+        onclick="return confirm('Resubmit this failed job from the same run folder and submit a new scheduler job?');"
+      >
+        Resubmit Failed
+      </button>
+    </form>
+    <form method="post" action="{% url 'job-mark-failed-delete' job.pk %}" style="margin:0;">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}" />
+      <button
+        type="submit"
+        onclick="return confirm('Mark this failed job for deletion and rename the remote run folder to *_to_delete?');"
+      >
+        Mark Failed for Deletion
+      </button>
+    </form>
+  </div>
+  {% elif job.status == "completed" and job.supports_replot_resubmit %}
+  <form method="post" action="{% url 'job-resubmit-replot' job.pk %}" style="margin:0;">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}" />
+    <button
+      type="submit"
+      onclick="return confirm('Resubmit this completed job with short queue settings (20m) to refresh plots/summary outputs?');"
+    >
+      Resubmit Replot
+    </button>
+  </form>
+  {% else %}
+  <span class="muted">No actions available for current status.</span>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h3>Status Events</h3>
+  <table>
+    <thead><tr><th>When</th><th>From</th><th>To</th><th>Message</th></tr></thead>
+    <tbody>
+      {% for evt in events %}
+      <tr>
+        <td>{{ evt.created_at }}</td>
+        <td>{{ evt.previous_status|default:"-" }}</td>
+        <td>{{ evt.status }}</td>
+        <td>{{ evt.message|default:"-" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4">No status events recorded.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

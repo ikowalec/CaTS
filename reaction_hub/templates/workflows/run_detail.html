@@ -1,0 +1,1570 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<!-- 3Dmol.js for WebGL interactive molecular visualization -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.4.2/3Dmol-min.js"></script>
+<style>
+  :root {
+    --primary: #2563eb;
+    --primary-hover: #1d4ed8;
+    --surface: #ffffff;
+    --bg-subtle: #f8fafc;
+    --border: #e2e8f0;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+  }
+  .workflow-page { max-width: 1560px; margin: 0 auto; padding-bottom: 50px; }
+  .card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+
+  /* Hero section */
+  .workflow-hero {
+    padding: 24px 28px;
+    background: linear-gradient(135deg, #ffffff 55%, #f0f7ff 100%);
+    border: 1px solid #dbeafe;
+  }
+  .workflow-hero__top { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; }
+  .workflow-eyebrow {
+    color: var(--primary);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .workflow-title {
+    margin: 4px 0 10px;
+    color: var(--text-main);
+    font-size: clamp(1.4rem, 2.2vw, 2.1rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    overflow-wrap: anywhere;
+  }
+  .workflow-subtitle {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+    color: #475569;
+    font-weight: 500;
+    font-size: 0.95rem;
+  }
+  .workflow-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 9999px;
+    background: #dcfce7;
+    color: #166534;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-transform: capitalize;
+  }
+  .workflow-status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .workflow-status.status-failed, .workflow-status.status-cancelled { background: #fee2e2; color: #991b1b; }
+  .workflow-status.status-running { background: #ccfbf1; color: #115e59; }
+  .workflow-status.status-deleted { background: #ffedd5; color: #9a3412; }
+
+  /* Unit Switcher Pills */
+  .unit-switcher {
+    display: inline-flex;
+    align-items: center;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 2px;
+    gap: 2px;
+  }
+  .unit-btn {
+    padding: 3px 10px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .unit-btn.active {
+    background: #ffffff;
+    color: var(--primary);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+  }
+
+  /* Hero metrics */
+  .workflow-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-top: 22px;
+  }
+  .workflow-metric-card {
+    padding: 14px 18px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .workflow-metric-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+  }
+  .workflow-metric-card.accent-red { border-left: 4px solid #ef4444; background: linear-gradient(to right, #fef2f2, #ffffff); }
+  .workflow-metric-card.accent-blue { border-left: 4px solid #3b82f6; background: linear-gradient(to right, #eff6ff, #ffffff); }
+  .workflow-metric-card.accent-amber { border-left: 4px solid #f59e0b; background: linear-gradient(to right, #fffbeb, #ffffff); }
+  .workflow-metric-card.accent-purple { border-left: 4px solid #8b5cf6; background: linear-gradient(to right, #faf5ff, #ffffff); }
+  .workflow-metric-card.accent-indigo { border-left: 4px solid #6366f1; background: linear-gradient(to right, #eef2ff, #ffffff); }
+  .workflow-metric-card .metric-label {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+  .workflow-metric-card .metric-val {
+    color: var(--text-main);
+    font-size: 1.4rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+
+  /* Meta description list */
+  .workflow-meta {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px 20px;
+    margin: 22px 0 0;
+    padding-top: 18px;
+    border-top: 1px solid #e2e8f0;
+  }
+  .workflow-meta__item { min-width: 0; }
+  .workflow-meta__item--wide { grid-column: 1 / -1; }
+  .workflow-meta dt {
+    margin-bottom: 4px;
+    color: var(--text-muted);
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .workflow-meta dd { margin: 0; color: #1e293b; font-weight: 500; font-size: 0.9rem; overflow-wrap: anywhere; }
+  .workflow-meta__item--wide dd {
+    color: #475569;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 0.84rem;
+    background: #f1f5f9;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .copy-btn {
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 0.76rem;
+    font-weight: 600;
+    cursor: pointer;
+    color: #334155;
+    transition: all 0.15s ease;
+  }
+  .copy-btn:hover { background: #f8fafc; border-color: #94a3b8; }
+
+  /* Tabs */
+  .workflow-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 6px 10px;
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 20px;
+    position: sticky;
+    top: 10px;
+    z-index: 20;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+  }
+  .workflow-tab {
+    padding: 8px 16px;
+    border-radius: 8px;
+    color: #475569;
+    font-weight: 600;
+    font-size: 0.92rem;
+    text-decoration: none;
+    transition: all 0.15s ease;
+  }
+  .workflow-tab:hover { background: #f1f5f9; color: var(--text-main); }
+  .workflow-tab--active { background: var(--primary); color: #ffffff !important; box-shadow: 0 1px 2px rgba(37,99,235,0.3); }
+
+  /* Dashboard layout */
+  .workflow-dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .workflow-grid-2col {
+    display: grid;
+    grid-template-columns: 7fr 5fr;
+    gap: 20px;
+  }
+
+  .workflow-section { padding: 22px 24px; }
+  .workflow-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .workflow-section-header h3 {
+    margin: 0;
+    color: var(--text-main);
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  /* Buttons */
+  .workflow-actions__buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+  .workflow-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 38px;
+    padding: 0 14px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #f8fafc;
+    color: #0f172a;
+    font-size: 0.88rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .workflow-button:hover { background: #f1f5f9; border-color: #94a3b8; color: #000; }
+  .workflow-button--primary { border-color: #1d4ed8; background: #2563eb; color: #ffffff !important; }
+  .workflow-button--primary:hover { background: #1d4ed8; }
+  .workflow-button--ct { border-color: #6d28d9; background: #7c3aed; color: #ffffff !important; }
+  .workflow-button--ct:hover { background: #6d28d9; }
+  .workflow-button--3d { border-color: #059669; background: #10b981; color: #ffffff !important; }
+  .workflow-button--3d:hover { background: #059669; }
+
+  /* Key Plots showcase */
+  .key-plot-container {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+  @media (max-width: 960px) {
+    .key-plot-container {
+      grid-template-columns: 1fr;
+    }
+  }
+  .key-plot-card {
+    position: relative;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #ffffff;
+    padding: 14px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .key-plot-card__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .key-plot-card__title {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--text-main);
+    word-break: break-word;
+  }
+  .key-plot-card img {
+    width: 100%;
+    max-height: 650px;
+    object-fit: contain;
+    border-radius: 8px;
+    border: 1px solid #f1f5f9;
+    background: #ffffff;
+  }
+
+  /* Filter chips */
+  .filter-chips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .filter-chip {
+    padding: 4px 12px;
+    border-radius: 9999px;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .filter-chip:hover { background: #e2e8f0; color: #0f172a; }
+  .filter-chip.active { background: #2563eb; color: #ffffff; border-color: #1d4ed8; }
+
+  /* Search input */
+  .artifact-search-box {
+    padding: 6px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    width: 240px;
+  }
+
+  /* Tables */
+  .workflow-page table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.9rem;
+  }
+  .workflow-page th {
+    padding: 10px 14px;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border-bottom: 1px solid #e2e8f0;
+    text-align: left;
+  }
+  .workflow-page td {
+    padding: 11px 14px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #1e293b;
+    vertical-align: middle;
+  }
+  .workflow-page tbody tr:hover { background: #f8fafc; }
+
+  .unit-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: #e2e8f0;
+    color: #475569;
+    font-size: 0.76rem;
+    font-weight: 600;
+  }
+
+  /* Badges */
+  .artifact-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-left: 6px;
+  }
+  .artifact-badge-downloaded { background: #dcfce7; color: #15803d; }
+  .artifact-badge-local { background: #e0e7ff; color: #4338ca; }
+  .artifact-badge-hpc-ref { background: #fef3c7; color: #b45309; }
+  .artifact-badge-hpc-only { background: #fee2e2; color: #b91c1c; }
+
+  /* Artifacts 2-Column Grid Layout */
+  .artifacts-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  @media (max-width: 960px) {
+    .artifacts-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  .artifact-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 12px 14px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    transition: all 0.15s ease;
+  }
+  .artifact-card:hover {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+  }
+  .artifact-card__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .artifact-card__label-group {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 0.88rem;
+    line-height: 1.35;
+    word-break: break-word;
+  }
+  .artifact-card__label-group a {
+    color: #0f172a;
+    text-decoration: none;
+    font-weight: 700;
+  }
+  .artifact-card__label-group a:hover {
+    color: #2563eb;
+    text-decoration: underline;
+  }
+  .artifact-card__meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .artifact-pill {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .artifact-pill-kind {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+  }
+  .artifact-pill-job {
+    background: #f8fafc;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+  }
+  .artifact-card__path {
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    font-size: 0.78rem;
+    word-break: break-all;
+    line-height: 1.35;
+  }
+  .artifact-card__actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+    padding-top: 6px;
+    border-top: 1px solid #f1f5f9;
+  }
+
+  /* 3D Viewer Modal */
+  .viewer-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(15, 23, 42, 0.75);
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+    justify-content: center;
+    align-items: center;
+  }
+  .viewer-modal.open { display: flex; }
+  .viewer-modal__card {
+    background: #ffffff;
+    width: 90%;
+    max-width: 900px;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+  }
+  .viewer-modal__head {
+    padding: 16px 20px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8fafc;
+  }
+  .viewer-modal__body {
+    width: 100%;
+    height: 520px;
+    position: relative;
+    background: #0f172a;
+  }
+  .viewer-modal__controls {
+    padding: 12px 20px;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8fafc;
+  }
+
+  @media (max-width: 1024px) {
+    .workflow-grid-2col { grid-template-columns: 1fr; }
+    .workflow-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 640px) {
+    .workflow-hero { padding: 18px; }
+    .workflow-meta { grid-template-columns: 1fr; }
+    .workflow-metrics-grid { grid-template-columns: 1fr; }
+  }
+</style>
+{% endblock %}
+{% block content %}
+<div class="workflow-page">
+
+<!-- Hero Section -->
+<section class="card workflow-hero">
+  <div class="workflow-hero__top">
+    <div>
+      <div class="workflow-eyebrow">Workflow Run #{{ run.pk }}</div>
+      <h1 class="workflow-title">{{ run.run_name }}</h1>
+      <div class="workflow-subtitle">
+        <span><strong>Type:</strong> {{ run.workflow.name }}</span>
+        <span class="workflow-status status-{{ run.status }}">{{ run.status }}</span>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;align-items:center;">
+      <div class="unit-switcher" title="Toggle energy units across dashboard">
+        <button type="button" class="unit-btn active" data-unit="eV">eV</button>
+        <button type="button" class="unit-btn" data-unit="kJ/mol">kJ/mol</button>
+        <button type="button" class="unit-btn" data-unit="kcal/mol">kcal/mol</button>
+      </div>
+
+      {% if deletion_job %}
+      <form method="post" action="{% if deletion_job.status == 'initiated' or deletion_job.status == 'pending' or deletion_job.status == 'running' %}{% url 'job-scancel-delete' deletion_job.pk %}{% else %}{% url 'job-mark-delete' deletion_job.pk %}{% endif %}" style="margin:0;">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}" />
+        <button
+          type="submit"
+          aria-label="Delete run"
+          title="Delete run"
+          style="width:36px;height:36px;border:1px solid #fca5a5;border-radius:8px;background:#fee2e2;color:#b91c1c;font-size:22px;line-height:22px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;"
+          onclick="return confirm('{% if deletion_job.status == 'initiated' or deletion_job.status == 'pending' or deletion_job.status == 'running' %}Scancel this active job and mark it for deletion?{% else %}Mark job {{ deletion_job.scheduler_job_id }} for deletion?{% endif %}');"
+        >&times;</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if hero_metrics %}
+  <div class="workflow-metrics-grid">
+    {% for m in hero_metrics %}
+    <div class="workflow-metric-card accent-{{ m.accent }}">
+      <span class="metric-label">{{ m.label }}</span>
+      <div class="metric-val energy-convertible" data-raw-val="{{ m.value }}">{{ m.value }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <dl class="workflow-meta">
+    <div class="workflow-meta__item"><dt>Settings Profile</dt><dd>{{ run.settings_profile }}</dd></div>
+    <div class="workflow-meta__item"><dt>Nanocluster</dt><dd><strong>{{ resolved_nanocluster|default:run.reference_nanocluster|default:"-" }}</strong></dd></div>
+    <div class="workflow-meta__item">
+      <dt>Initial Adsorbate</dt>
+      <dd><strong>{{ resolved_initial_adsorbate|default:run.reference_adsorbate|default:"-" }}</strong></dd>
+    </div>
+    {% if resolved_final_adsorbate %}
+    <div class="workflow-meta__item">
+      <dt>Final Adsorbate</dt>
+      <dd><strong>{{ resolved_final_adsorbate }}</strong></dd>
+    </div>
+    {% endif %}
+    <div class="workflow-meta__item"><dt>Started / Completed</dt><dd>{{ run.started_at|default:"-" }} / {{ run.completed_at|default:"-" }}</dd></div>
+    <div class="workflow-meta__item workflow-meta__item--wide">
+      <dt>Working Directory</dt>
+      <dd>
+        <span id="workdir-text">{{ run.working_directory }}</span>
+        <button type="button" class="copy-btn" id="copy-workdir-btn" onclick="copyText('workdir-text', this)">Copy Path</button>
+      </dd>
+    </div>
+  </dl>
+</section>
+
+<!-- Tab Navigation -->
+<nav class="workflow-tabs" aria-label="Workflow sections">
+  <a class="workflow-tab{% if selected_tab == 'overview' %} workflow-tab--active{% endif %}" href="{% url 'workflow-run-detail' run.pk %}?tab=overview">Overview</a>
+  {% if mlneb_compare.is_mlneb_run %}
+  <a class="workflow-tab{% if selected_tab == 'mlneb_compare' %} workflow-tab--active{% endif %}" href="{% url 'workflow-run-detail' run.pk %}?tab=mlneb_compare">MLNEB Comparison</a>
+  {% endif %}
+  <a class="workflow-tab{% if selected_tab == 'bond_scan' %} workflow-tab--active{% endif %}" href="{% url 'workflow-run-detail' run.pk %}?tab=bond_scan">Bond Scan Comparison</a>
+  <a class="workflow-tab{% if selected_tab == 'structure_similarity' %} workflow-tab--active{% endif %}" href="{% url 'workflow-run-detail' run.pk %}?tab=structure_similarity">Structure Similarity</a>
+</nav>
+
+{% if selected_tab == "overview" %}
+<div class="workflow-dashboard">
+
+  <!-- 1. Key Workflow Plots & Animations -->
+  {% if key_plot_artifacts %}
+  <section class="card workflow-section">
+    <div class="workflow-section-header">
+      <h3>Key Workflow Plots & Animations</h3>
+    </div>
+    <div class="key-plot-container">
+      {% for artifact in key_plot_artifacts %}
+      <div class="key-plot-card" data-artifact-id="{{ artifact.pk }}">
+        <div class="key-plot-card__head">
+          <div class="key-plot-card__title">{{ artifact.label }}</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <a class="workflow-button" href="{% url 'artifact-content' artifact.pk %}" target="_blank" rel="noopener noreferrer">Inspect</a>
+            <a class="workflow-button" href="{% url 'artifact-file' artifact.pk %}?download=1">Download</a>
+            <button
+              type="button"
+              class="workflow-delete-image-btn"
+              data-url="{% url 'workflow-delete-image-artifact' run.pk artifact.pk %}"
+              aria-label="Delete image"
+              title="Delete image"
+              style="width:26px;height:26px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#991b1b;font-weight:700;cursor:pointer;"
+            >&times;</button>
+          </div>
+        </div>
+        <a href="{% url 'artifact-content' artifact.pk %}" target="_blank" rel="noopener noreferrer">
+          <img src="{% url 'artifact-file' artifact.pk %}" alt="{{ artifact.label }}" loading="lazy" />
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- 2. Grid: Follow-Up Submissions + Jobs -->
+  <div class="workflow-grid-2col">
+    <!-- Follow-up Submissions -->
+    <section class="card workflow-section">
+      <div class="workflow-section-header">
+        <h3>Follow-Up Submissions</h3>
+      </div>
+      <div class="workflow-actions__buttons">
+        {% if source_run %}
+        <a class="workflow-button workflow-button--ct" href="{% url 'workflow-run-detail' source_run.pk %}">View Original Workflow</a>
+        {% endif %}
+        <a class="workflow-button" href="{% url 'job-submit' %}?from_run={{ run.pk }}">Reuse Structure</a>
+        <a class="workflow-button workflow-button--primary" href="{% url 'job-submit' %}?from_run={{ run.pk }}&mode=tddft_bond_scan">Start TDDFT Bond Scan</a>
+        <form method="post" action="{% url 'job-submit' %}?from_run={{ run.pk }}&mode=charge_transfer" style="display:inline-block;margin:0;">
+          {% csrf_token %}
+          <input type="hidden" name="quick_charge_transfer" value="1" />
+          <button type="submit" class="workflow-button workflow-button--ct">Request CT Spectrum</button>
+        </form>
+        {% if replot_resubmit_job %}
+        <form method="post" action="{% url 'job-resubmit-replot' replot_resubmit_job.pk %}" style="display:inline-block;margin:0;">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{% url 'workflow-run-detail' run.pk %}" />
+          <button type="submit" class="workflow-button" style="background:#0284c7;color:#fff;border-color:#0369a1;">Resubmit Replot</button>
+        </form>
+        {% endif %}
+        {% if smooth_resubmit_job %}
+        <form method="post" action="{% url 'job-resubmit-smooth' smooth_resubmit_job.pk %}" style="display:inline-block;margin:0;">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{% url 'workflow-run-detail' run.pk %}" />
+          <button type="submit" class="workflow-button" style="background:#d97706;color:#fff;border-color:#b45309;">TS Smoothing Resubmit</button>
+        </form>
+        {% endif %}
+      </div>
+      <div class="muted" style="margin-top:12px;font-size:0.85rem;line-height:1.4;">
+        Opens job submission with geometry pre-populated from this run.
+      </div>
+    </section>
+
+    <!-- Jobs Table -->
+    <section class="card workflow-section">
+      <div class="workflow-section-header">
+        <h3>Linked HPC Jobs</h3>
+      </div>
+      <table>
+        <thead><tr><th>Job ID</th><th>Name</th><th>Status</th><th>Updated</th></tr></thead>
+        <tbody>
+          {% for job in jobs %}
+          <tr>
+            <td><a href="/jobs/{{ job.pk }}/"><strong>{{ job.scheduler_job_id }}</strong></a></td>
+            <td>{{ job.job_name }}</td>
+            <td><span class="workflow-status status-{{ job.status }}" style="font-size:0.75rem;padding:2px 8px;">{{ job.status }}</span></td>
+            <td>{{ job.updated_at|date:"Y-m-d H:i" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="muted">No jobs linked.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  </div>
+
+  <!-- 3. Computed Properties -->
+  <section class="card workflow-section">
+    <div class="workflow-section-header">
+      <h3>Computed Properties</h3>
+      <div class="unit-switcher" title="Toggle energy units">
+        <button type="button" class="unit-btn active" data-unit="eV">eV</button>
+        <button type="button" class="unit-btn" data-unit="kJ/mol">kJ/mol</button>
+        <button type="button" class="unit-btn" data-unit="kcal/mol">kcal/mol</button>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>Property Name</th><th>Calculated Value</th><th>Unit</th></tr></thead>
+      <tbody>
+        {% for prop in properties %}
+        <tr>
+          <td>{{ prop.name }}</td>
+          <td>
+            {% if prop.value_float is not None %}
+              <span class="prop-val{% if prop.unit == 'eV' %} energy-convertible{% endif %}" data-raw-val="{{ prop.value_float|floatformat:2 }}" data-unit="{{ prop.unit }}">{{ prop.value_float|floatformat:2 }}</span>
+            {% else %}
+              {{ prop.value_text }}
+            {% endif %}
+          </td>
+          <td>
+            {% if prop.unit %}
+            <span class="unit-badge prop-unit" data-base-unit="{{ prop.unit }}">{{ prop.unit }}</span>
+            {% else %}-{% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="3" class="muted">No computed properties available.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 4. Rendered Images (if present) -->
+  <div class="card workflow-section" id="workflow-rendered-images-card" {% if not render_image_artifacts %}style="display:none;"{% endif %}>
+    <div class="workflow-section-header">
+      <h3>Rendered Structure Images</h3>
+    </div>
+    <div id="workflow-rendered-images-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;">
+      {% for artifact in render_image_artifacts %}
+      <div class="key-plot-card" data-artifact-id="{{ artifact.pk }}">
+        <div class="key-plot-card__head">
+          <div class="key-plot-card__title" style="font-size:0.9rem;">{{ artifact.label }}</div>
+          <button
+            type="button"
+            class="workflow-delete-image-btn"
+            data-url="{% url 'workflow-delete-image-artifact' run.pk artifact.pk %}"
+            aria-label="Delete image"
+            style="width:24px;height:24px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;color:#991b1b;cursor:pointer;"
+          >&times;</button>
+        </div>
+        <a href="{% url 'artifact-content' artifact.pk %}" target="_blank" rel="noopener noreferrer">
+          <img src="{% url 'artifact-file' artifact.pk %}" alt="{{ artifact.label }}" style="max-height:300px;width:100%;object-fit:contain;" />
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- 5. Artifacts & Data Management -->
+  <section class="card workflow-section">
+    <div class="workflow-section-header">
+      <h3>Artifacts</h3>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <input type="text" id="artifact-search-input" class="artifact-search-box" placeholder="Search artifacts..." />
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:0.85rem;cursor:pointer;">
+          <input type="checkbox" id="workflow-show-artifact-paths" /> Show path
+        </label>
+        <button
+          type="button"
+          id="workflow-delete-duplicate-artifacts-btn"
+          data-url="{% url 'workflow-delete-duplicate-artifacts' run.pk %}"
+          class="workflow-button"
+          style="min-height:30px;font-size:0.8rem;padding:0 8px;"
+        >
+          Clean duplicates
+        </button>
+      </div>
+    </div>
+
+    <!-- Filter Chips -->
+    <div class="filter-chips">
+      <button type="button" class="filter-chip active" data-filter="all">All</button>
+      <button type="button" class="filter-chip" data-filter="structure">Structures</button>
+      <button type="button" class="filter-chip" data-filter="trajectory">Trajectories</button>
+      <button type="button" class="filter-chip" data-filter="image">Plots & Animations</button>
+      <button type="button" class="filter-chip" data-filter="log">Logs & JSON</button>
+    </div>
+
+    <div style="display:none;">{% csrf_token %}</div>
+    <div class="muted" id="workflow-action-status" style="margin-bottom:10px;"></div>
+
+    <div class="artifacts-grid" id="artifacts-grid">
+      {% for artifact in artifacts %}
+      <div class="artifact-card artifact-row" data-kind="{{ artifact.kind }}" data-label="{{ artifact.label|lower }}">
+        <div class="artifact-card__head">
+          <div class="artifact-card__label-group">
+            <a href="{% url 'artifact-content' artifact.pk %}" target="_blank" rel="noopener noreferrer"><strong>{{ artifact.label }}</strong></a>
+            {% if artifact.metadata.remote_only %}
+            <span class="artifact-badge artifact-badge-hpc-only">HPC only</span>
+            {% elif artifact.metadata.remote_path and not artifact.metadata.local_cache_path or artifact.metadata.source == "remote_summary" and not artifact.metadata.local_cache_path %}
+            <span class="artifact-badge artifact-badge-hpc-ref">HPC path reference</span>
+            {% elif artifact.metadata.local_cache_path or artifact.metadata.downloaded_from_hpc %}
+            <span class="artifact-badge artifact-badge-downloaded">Downloaded</span>
+            {% else %}
+            <span class="artifact-badge artifact-badge-local">Local</span>
+            {% endif %}
+          </div>
+          <div class="artifact-card__meta">
+            <span class="artifact-pill artifact-pill-kind"><code>{{ artifact.kind }}</code></span>
+            {% if artifact.source_scheduler_job_id %}
+            <span class="artifact-pill artifact-pill-job" title="Source Job ID"><code>#{{ artifact.source_scheduler_job_id }}</code></span>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="artifact-path-col artifact-card__path" style="display:none;">
+          <div style="font-weight:600;color:#334155;margin-bottom:2px;">{{ artifact.path }}</div>
+          {% if artifact.metadata.remote_path %}
+          <div class="muted" style="font-size:0.75rem;">HPC: {{ artifact.metadata.remote_path }}</div>
+          {% endif %}
+        </div>
+
+        <div class="artifact-card__actions">
+          <a class="workflow-button" style="min-height:28px;padding:0 8px;font-size:0.8rem;" href="{% url 'artifact-content' artifact.pk %}" target="_blank" rel="noopener noreferrer">Inspect</a>
+
+          {% if artifact.pk in renderable_3d_artifact_ids or artifact.kind == "structure" or artifact.kind == "trajectory" %}
+          {% if artifact.pk in content_available_artifact_ids %}
+          <button
+            type="button"
+            class="workflow-button workflow-button--3d inspect-3d-btn"
+            style="min-height:28px;padding:0 8px;font-size:0.8rem;"
+            data-file-url="{% url 'artifact-file' artifact.pk %}"
+            data-label="{{ artifact.label }}"
+          >
+            3D View
+          </button>
+          {% endif %}
+          {% endif %}
+
+          {% if artifact.pk in content_available_artifact_ids %}
+          <a class="workflow-button" style="min-height:28px;padding:0 8px;font-size:0.8rem;" href="{% url 'artifact-file' artifact.pk %}?download=1">Download</a>
+          {% endif %}
+          {% if artifact.metadata.remote_only or artifact.pk not in content_available_artifact_ids and artifact.metadata.remote_path or artifact.pk not in content_available_artifact_ids and artifact.metadata.source == "remote_summary" %}
+          <button
+            type="button"
+            class="workflow-button workflow-ingest-btn"
+            style="min-height:28px;padding:0 8px;font-size:0.8rem;background:#eff6ff;border-color:#93c5fd;color:#1d4ed8;"
+            data-url="{% url 'workflow-ingest-artifact' run.pk artifact.pk %}"
+            data-label="{{ artifact.label }}"
+            title="Retrieve and store this HPC-only artifact locally via Celery"
+          >
+            Ingest
+          </button>
+          {% endif %}
+          {% if artifact.batch_submit_url %}
+          <a class="workflow-button workflow-button--primary" style="min-height:28px;padding:0 8px;font-size:0.8rem;" href="{{ artifact.batch_submit_url|safe }}">Batch Single Opts</a>
+          {% endif %}
+          {% if artifact.pk in ase_openable_artifact_ids %}
+          <button
+            type="button"
+            class="workflow-button workflow-open-ase-btn"
+            style="min-height:28px;padding:0 8px;font-size:0.8rem;background:#f0fdf4;border-color:#86efac;color:#166534;"
+            data-url="{% url 'workflow-open-artifact-ase-gui' run.pk artifact.pk %}"
+          >
+            Open ASE
+          </button>
+          {% endif %}
+          {% if artifact.pk in xyzrender_artifact_ids %}
+            {% if artifact.pk in xyzrender_scan_endpoints_db_artifact_ids %}
+            <select id="workflow-render-mode-{{ artifact.pk }}" style="font-size:0.78rem;padding:2px 4px;border-radius:4px;border:1px solid #cbd5e1;">
+              <option value="transition_state">TS image</option>
+              <option value="first">First endpoint</option>
+              <option value="last">Last endpoint</option>
+              <option value="trajectory">Full scan</option>
+            </select>
+            {% elif artifact.pk in xyzrender_trajectory_artifact_ids %}
+            <select id="workflow-render-mode-{{ artifact.pk }}" style="font-size:0.78rem;padding:2px 4px;border-radius:4px;border:1px solid #cbd5e1;">
+              <option value="converged">Converged</option>
+              <option value="trajectory">Traj GIF</option>
+            </select>
+            {% endif %}
+            <select id="workflow-render-rot-{{ artifact.pk }}" style="font-size:0.78rem;padding:2px 4px;border-radius:4px;border:1px solid #cbd5e1;">
+              <option value="x">x</option><option value="y">y</option><option value="z">z</option>
+              <option value="xy">xy</option><option value="xz">xz</option><option value="yz">yz</option>
+            </select>
+            <button
+              type="button"
+              class="workflow-button workflow-render-btn"
+              style="min-height:28px;padding:0 8px;font-size:0.8rem;"
+              data-url="{% url 'workflow-render-artifact-xyz' run.pk artifact.pk %}"
+              data-rotation-select="workflow-render-rot-{{ artifact.pk }}"
+              data-mode-select="{% if artifact.pk in xyzrender_trajectory_artifact_ids or artifact.pk in xyzrender_scan_endpoints_db_artifact_ids %}workflow-render-mode-{{ artifact.pk }}{% endif %}"
+              data-render-output="gif"
+            >
+              Render GIF
+            </button>
+            <button
+              type="button"
+              class="workflow-button workflow-render-btn"
+              style="min-height:28px;padding:0 8px;font-size:0.8rem;"
+              data-url="{% url 'workflow-render-artifact-xyz' run.pk artifact.pk %}"
+              data-rotation-select="workflow-render-rot-{{ artifact.pk }}"
+              data-mode-select="{% if artifact.pk in xyzrender_trajectory_artifact_ids or artifact.pk in xyzrender_scan_endpoints_db_artifact_ids %}workflow-render-mode-{{ artifact.pk }}{% endif %}"
+              data-render-output="svg"
+            >
+              Render SVG
+            </button>
+          {% endif %}
+        </div>
+      </div>
+      {% empty %}
+      <div class="muted" style="grid-column:1/-1;padding:12px;">No artifacts linked.</div>
+      {% endfor %}
+      <div id="artifacts-empty-filter" class="muted" style="display:none;grid-column:1/-1;padding:16px;text-align:center;">No artifacts match the selected search or filter.</div>
+    </div>
+  </section>
+
+</div>
+
+{% elif selected_tab == "mlneb_compare" %}
+<!-- MLNEB Comparison Section -->
+<div class="workflow-dashboard">
+
+  <!-- Selector Bar -->
+  <section class="card workflow-section">
+    <div class="workflow-section-header">
+      <h3>Compare with Another MLNEB Workflow</h3>
+    </div>
+    <form method="get" style="display:flex;gap:12px;align-items:end;flex-wrap:wrap;">
+      <input type="hidden" name="tab" value="mlneb_compare" />
+      <div style="flex:1;min-width:280px;">
+        <label style="font-size:0.85rem;font-weight:700;color:#475569;display:block;margin-bottom:5px;">Select MLNEB Candidate Job:</label>
+        <select name="mlneb_compare_run_id" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:0.9rem;">
+          {% for cand in mlneb_compare.candidates %}
+          <option value="{{ cand.id }}" {% if cand.id == mlneb_compare.selected_run_id %}selected{% endif %}>
+            #{{ cand.id }}: {{ cand.name }}{% if cand.formula %} ({{ cand.formula }}){% endif %}{% if cand.is_matching_formula %} ★ [Matching Formula]{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="workflow-button workflow-button--primary" style="height:38px;">Compare MEPs</button>
+    </form>
+    {% if mlneb_compare.error %}
+    <p style="color:#b91c1c;margin-top:12px;"><strong>Error:</strong> {{ mlneb_compare.error }}</p>
+    {% endif %}
+  </section>
+
+  {% if mlneb_compare.has_comparison %}
+  <!-- 1. Common Axis Energy Profile Plot -->
+  <section class="card workflow-section">
+    <div class="workflow-section-header">
+      <h3>Common-Axis Energy Profile Comparison</h3>
+      <div style="font-size:0.85rem;color:#475569;">
+        Shared MEP Coordinate ($s$ in Å)
+      </div>
+    </div>
+
+    <!-- Top Stat Banner Above Plot -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px;">
+      <div style="padding:12px 16px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;">
+        <span style="font-size:0.75rem;font-weight:700;color:#1e40af;text-transform:uppercase;">ΔΔE‡ (Forward Barrier)</span>
+        <div style="font-size:1.25rem;font-weight:800;color:#1e3a8a;margin-top:2px;">
+          <span class="energy-convertible" data-raw-val="{{ mlneb_compare.delta_ea_fwd_eV }}">{{ mlneb_compare.delta_ea_fwd_eV|floatformat:3 }} eV</span>
+        </div>
+      </div>
+      <div style="padding:12px 16px;background:#fef3c7;border:1px solid #fde68a;border-radius:10px;">
+        <span style="font-size:0.75rem;font-weight:700;color:#92400e;text-transform:uppercase;">ΔΔE‡_rev (Reverse Barrier)</span>
+        <div style="font-size:1.25rem;font-weight:800;color:#78350f;margin-top:2px;">
+          <span class="energy-convertible" data-raw-val="{{ mlneb_compare.delta_ea_rev_eV }}">{{ mlneb_compare.delta_ea_rev_eV|floatformat:3 }} eV</span>
+        </div>
+      </div>
+      <div style="padding:12px 16px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;">
+        <span style="font-size:0.75rem;font-weight:700;color:#065f46;text-transform:uppercase;">ΔE_TS (TS Absolute Energy)</span>
+        <div style="font-size:1.25rem;font-weight:800;color:#064e3b;margin-top:2px;">
+          <span class="energy-convertible" data-raw-val="{{ mlneb_compare.delta_e_ts_eV }}">{{ mlneb_compare.delta_e_ts_eV|floatformat:3 }} eV</span>
+        </div>
+      </div>
+      <div style="padding:12px 16px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;">
+        <span style="font-size:0.75rem;font-weight:700;color:#5b21b6;text-transform:uppercase;">ΔΔErxn (Reaction Energy)</span>
+        <div style="font-size:1.25rem;font-weight:800;color:#4c1d95;margin-top:2px;">
+          <span class="energy-convertible" data-raw-val="{{ mlneb_compare.delta_erxn_eV }}">{{ mlneb_compare.delta_erxn_eV|floatformat:3 }} eV</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="key-plot-card" style="padding:16px;">
+      <img src="data:image/png;base64,{{ mlneb_compare.comparison_plot_b64 }}" alt="Common Axis MEP Comparison" style="width:100%;max-height:600px;object-fit:contain;" />
+    </div>
+  </section>
+
+  <!-- 2. Side-by-Side Transition State Geometries -->
+  <div class="workflow-grid-2col">
+    <section class="card workflow-section">
+      <div class="workflow-section-header">
+        <h3>Transition State: #{{ mlneb_compare.mep_a.run_id }} (Current)</h3>
+        {% if mlneb_compare.mep_a.ts_artifact_pk %}
+        <button
+          type="button"
+          class="workflow-button workflow-button--3d inspect-3d-btn"
+          data-file-url="{% url 'artifact-file' mlneb_compare.mep_a.ts_artifact_pk %}"
+          data-label="TS #{{ mlneb_compare.mep_a.run_id }}"
+        >
+          3D View
+        </button>
+        {% endif %}
+      </div>
+      <dl class="workflow-meta" style="margin:0;padding:0;border:none;grid-template-columns:1fr 1fr;">
+        <div class="workflow-meta__item"><dt>Run Name</dt><dd>#{{ mlneb_compare.mep_a.run_id }}</dd></div>
+        <div class="workflow-meta__item"><dt>Cluster Formula</dt><dd><strong>{{ mlneb_compare.mep_a.cluster_formula }}</strong></dd></div>
+        <div class="workflow-meta__item"><dt>Initial State</dt><dd>{{ mlneb_compare.mep_a.ads_init }}</dd></div>
+        <div class="workflow-meta__item"><dt>Final State</dt><dd>{{ mlneb_compare.mep_a.ads_final }}</dd></div>
+        <div class="workflow-meta__item"><dt>Forward Barrier (Ea)</dt><dd><strong style="color:#2563eb;">{{ mlneb_compare.mep_a.forward_barrier_eV|floatformat:3 }} eV</strong></dd></div>
+        <div class="workflow-meta__item"><dt>Reverse Barrier (Ea_rev)</dt><dd><strong style="color:#0284c7;">{{ mlneb_compare.mep_a.reverse_barrier_eV|floatformat:3 }} eV</strong></dd></div>
+        <div class="workflow-meta__item"><dt>TS Energy (E_TS)</dt><dd>{{ mlneb_compare.mep_a.ts_energy_eV|floatformat:4 }} eV</dd></div>
+        <div class="workflow-meta__item"><dt>TS Shift</dt><dd>{{ mlneb_compare.mep_a.ts_shift|floatformat:3 }} Å</dd></div>
+      </dl>
+    </section>
+
+    <section class="card workflow-section">
+      <div class="workflow-section-header">
+        <h3>Transition State: #{{ mlneb_compare.mep_b.run_id }} (Compared)</h3>
+        {% if mlneb_compare.mep_b.ts_artifact_pk %}
+        <button
+          type="button"
+          class="workflow-button workflow-button--3d inspect-3d-btn"
+          data-file-url="{% url 'artifact-file' mlneb_compare.mep_b.ts_artifact_pk %}"
+          data-label="TS #{{ mlneb_compare.mep_b.run_id }}"
+        >
+          3D View
+        </button>
+        {% endif %}
+      </div>
+      <dl class="workflow-meta" style="margin:0;padding:0;border:none;grid-template-columns:1fr 1fr;">
+        <div class="workflow-meta__item"><dt>Run Name</dt><dd>#{{ mlneb_compare.mep_b.run_id }}</dd></div>
+        <div class="workflow-meta__item"><dt>Cluster Formula</dt><dd><strong>{{ mlneb_compare.mep_b.cluster_formula }}</strong></dd></div>
+        <div class="workflow-meta__item"><dt>Initial State</dt><dd>{{ mlneb_compare.mep_b.ads_init }}</dd></div>
+        <div class="workflow-meta__item"><dt>Final State</dt><dd>{{ mlneb_compare.mep_b.ads_final }}</dd></div>
+        <div class="workflow-meta__item"><dt>Forward Barrier (Ea)</dt><dd><strong style="color:#d97706;">{{ mlneb_compare.mep_b.forward_barrier_eV|floatformat:3 }} eV</strong></dd></div>
+        <div class="workflow-meta__item"><dt>Reverse Barrier (Ea_rev)</dt><dd><strong style="color:#b45309;">{{ mlneb_compare.mep_b.reverse_barrier_eV|floatformat:3 }} eV</strong></dd></div>
+        <div class="workflow-meta__item"><dt>TS Energy (E_TS)</dt><dd>{{ mlneb_compare.mep_b.ts_energy_eV|floatformat:4 }} eV</dd></div>
+        <div class="workflow-meta__item"><dt>TS Shift</dt><dd>{{ mlneb_compare.mep_b.ts_shift|floatformat:3 }} Å</dd></div>
+      </dl>
+    </section>
+  </div>
+
+  <!-- 3. Side-by-Side Kinetics & Thermodynamics Table -->
+  <section class="card workflow-section">
+    <div class="workflow-section-header">
+      <h3>Detailed Reaction Kinetics & Thermodynamics Comparison</h3>
+      {% if mlneb_compare.ts_similarity %}
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;padding:4px 12px;border-radius:8px;font-size:0.85rem;color:#1e40af;">
+        <strong>TS SOAP REMatch Similarity:</strong> {{ mlneb_compare.ts_similarity.score|floatformat:6 }}
+      </div>
+      {% endif %}
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Property / Metric</th>
+          <th>#{{ mlneb_compare.mep_a.run_id }} (Current)</th>
+          <th>#{{ mlneb_compare.mep_b.run_id }} (Compared)</th>
+          <th>Difference (Δ / Ratio)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Reaction Pathway</strong></td>
+          <td>{{ mlneb_compare.mep_a.ads_init }} → {{ mlneb_compare.mep_a.ads_final }}</td>
+          <td>{{ mlneb_compare.mep_b.ads_init }} → {{ mlneb_compare.mep_b.ads_final }}</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><strong>Forward Barrier (ΔE‡)</strong></td>
+          <td><strong>{{ mlneb_compare.mep_a.forward_barrier_eV|floatformat:4 }} eV</strong> ({{ mlneb_compare.mep_a.forward_barrier_kj|floatformat:2 }} kJ/mol)</td>
+          <td><strong>{{ mlneb_compare.mep_b.forward_barrier_eV|floatformat:4 }} eV</strong> ({{ mlneb_compare.mep_b.forward_barrier_kj|floatformat:2 }} kJ/mol)</td>
+          <td><strong>{{ mlneb_compare.delta_ea_fwd_eV|floatformat:4 }} eV</strong> ({{ mlneb_compare.delta_ea_fwd_kj|floatformat:2 }} kJ/mol)</td>
+        </tr>
+        <tr>
+          <td><strong>Reverse Barrier (ΔE‡_rev)</strong></td>
+          <td><strong>{{ mlneb_compare.mep_a.reverse_barrier_eV|floatformat:4 }} eV</strong> ({{ mlneb_compare.mep_a.reverse_barrier_kj|floatformat:2 }} kJ/mol)</td>
+          <td><strong>{{ mlneb_compare.mep_b.reverse_barrier_eV|floatformat:4 }} eV</strong> ({{ mlneb_compare.mep_b.reverse_barrier_kj|floatformat:2 }} kJ/mol)</td>
+          <td><strong>{{ mlneb_compare.delta_ea_rev_eV|floatformat:4 }} eV</strong> ({{ mlneb_compare.delta_ea_rev_kj|floatformat:2 }} kJ/mol)</td>
+        </tr>
+        <tr>
+          <td><strong>Reaction Energy (ΔE)</strong></td>
+          <td>{{ mlneb_compare.mep_a.reaction_energy_eV|floatformat:4 }} eV ({{ mlneb_compare.mep_a.reaction_energy_kj|floatformat:2 }} kJ/mol)</td>
+          <td>{{ mlneb_compare.mep_b.reaction_energy_eV|floatformat:4 }} eV ({{ mlneb_compare.mep_b.reaction_energy_kj|floatformat:2 }} kJ/mol)</td>
+          <td>{{ mlneb_compare.delta_erxn_eV|floatformat:4 }} eV ({{ mlneb_compare.delta_erxn_kj|floatformat:2 }} kJ/mol)</td>
+        </tr>
+        <tr>
+          <td><strong>Transition State Energy (E_TS)</strong></td>
+          <td>{{ mlneb_compare.mep_a.ts_energy_eV|floatformat:4 }} eV</td>
+          <td>{{ mlneb_compare.mep_b.ts_energy_eV|floatformat:4 }} eV</td>
+          <td><strong>{{ mlneb_compare.delta_e_ts_eV|floatformat:4 }} eV</strong> ({{ mlneb_compare.delta_e_ts_kj|floatformat:2 }} kJ/mol)</td>
+        </tr>
+        <tr>
+          <td><strong>Cumulative Shift to TS (s_TS)</strong></td>
+          <td>{{ mlneb_compare.mep_a.ts_shift|floatformat:3 }} Å</td>
+          <td>{{ mlneb_compare.mep_b.ts_shift|floatformat:3 }} Å</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><strong>Total Path Length</strong></td>
+          <td>{{ mlneb_compare.mep_a.shifts|last|floatformat:3 }} Å</td>
+          <td>{{ mlneb_compare.mep_b.shifts|last|floatformat:3 }} Å</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><strong>MEP Image Count</strong></td>
+          <td>{{ mlneb_compare.mep_a.n_images }} images</td>
+          <td>{{ mlneb_compare.mep_b.n_images }} images</td>
+          <td>-</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
+</div>
+{% elif selected_tab == "structure_similarity" %}
+<div class="card workflow-section">
+  <div class="workflow-section-header">
+    <h3>Structure Similarity</h3>
+  </div>
+  <form method="get" style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:14px;">
+    <input type="hidden" name="tab" value="structure_similarity" />
+    <div>
+      <label style="font-size:0.85rem;font-weight:600;">Compare with Run ID:</label><br />
+      <input type="number" name="compare_run_id" value="{{ structure_similarity.compare_run_id }}" min="1" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;" />
+    </div>
+    <button type="submit" class="workflow-button workflow-button--primary">Compute Similarity</button>
+  </form>
+  {% if structure_similarity.error %}
+  <p style="color:#b91c1c;">{{ structure_similarity.error }}</p>
+  {% elif structure_similarity.has_result %}
+  <table>
+    <thead><tr><th>Run</th><th>Formula</th><th>REMatch Similarity</th><th>Raw Cross</th><th>Raw Self</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><a href="{% url 'workflow-run-detail' run.pk %}"><strong>#{{ run.pk }}: {{ run.run_name }}</strong></a></td>
+        <td>{{ structure_similarity.formula|default:"-" }}</td>
+        <td rowspan="2"><strong>{{ structure_similarity.score|floatformat:8 }}</strong></td>
+        <td rowspan="2">{{ structure_similarity.raw_score|floatformat:8 }}</td>
+        <td>{{ structure_similarity.self_score|floatformat:8 }}</td>
+      </tr>
+      <tr>
+        <td><a href="{% url 'workflow-run-detail' structure_similarity.other_run.pk %}"><strong>#{{ structure_similarity.other_run.pk }}: {{ structure_similarity.other_run.run_name }}</strong></a></td>
+        <td>{{ structure_similarity.other_formula|default:"-" }}</td>
+        <td>{{ structure_similarity.other_self_score|floatformat:8 }}</td>
+      </tr>
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">Enter another run ID to compare final structures via SOAP REMatch.</p>
+  {% endif %}
+</div>
+{% else %}
+<div class="card workflow-section">
+  <div class="workflow-section-header">
+    <h3>Bond-Length Scan Comparison</h3>
+  </div>
+  <p class="muted" style="margin-bottom:16px;">
+    Linked runs are selected by identical structure hash (preferred) or formula.
+    Filter by target wavelength to compare scans for the same structure identity.
+  </p>
+  <form method="get" style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:14px;">
+    <input type="hidden" name="tab" value="bond_scan" />
+    <div>
+      <label style="font-size:0.85rem;font-weight:600;">Target Wavelength (nm)</label><br />
+      <select name="scan_target_nm" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;">
+        <option value="">All</option>
+        {% for value in bond_scan_compare.available_targets_nm %}
+        <option value="{{ value }}" {% if bond_scan_compare.selected_target_nm == value %}selected{% endif %}>{{ value|floatformat:2 }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="workflow-button workflow-button--primary">Apply</button>
+    <a class="workflow-button" href="{% url 'workflow-run-detail' run.pk %}?tab=bond_scan">Reset</a>
+  </form>
+  <div class="muted" style="margin-bottom:12px;font-size:0.85rem;">
+    Current formula: <strong>{{ bond_scan_compare.current_formula|default:"-" }}</strong>
+    {% if bond_scan_compare.current_structure_hash %}
+      | Current hash: <code>{{ bond_scan_compare.current_structure_hash|slice:":12" }}...</code>
+    {% endif %}
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Run</th>
+        <th>Target nm</th>
+        <th>Estart (eV)</th>
+        <th>Epeak (eV)</th>
+        <th>Ea (eV)</th>
+        <th>Formula</th>
+        <th>Structure Hash</th>
+        <th>Linked Runs</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in bond_scan_compare.rows %}
+      <tr>
+        <td>
+          {% if row.run_id %}
+          <a href="{% url 'workflow-run-detail' row.run_id %}"><strong>{{ row.run_name }}</strong></a>
+          {% else %}
+          <strong>{{ row.run_name }}</strong>
+          {% endif %}
+          {% if row.is_current_run %}<span class="artifact-badge artifact-badge-downloaded">current</span>{% endif %}
+        </td>
+        <td>{{ row.target_wavelength_nm|floatformat:2|default:"-" }}</td>
+        <td>{{ row.bond_scan_start_energy_eV|floatformat:4|default:"-" }}</td>
+        <td>{{ row.bond_scan_peak_energy_eV|floatformat:4|default:"-" }}</td>
+        <td>{{ row.bond_scan_activation_barrier_eV|floatformat:4|default:"-" }}</td>
+        <td>{{ row.formula|default:"-" }}</td>
+        <td>{% if row.structure_sha256 %}<code>{{ row.structure_sha256|slice:":12" }}...</code>{% else %}-{% endif %}</td>
+        <td>{{ row.link_group_size|default:1 }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="8" class="muted">No bond-scan runs matched this structure identity and filter.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+</div>
+
+<!-- 3D Molecule Viewer Modal -->
+<div class="viewer-modal" id="viewer-modal">
+  <div class="viewer-modal__card">
+    <div class="viewer-modal__head">
+      <div style="font-weight:700;font-size:1.05rem;" id="viewer-title">3D Structure Viewer</div>
+      <button type="button" style="border:none;background:transparent;font-size:24px;cursor:pointer;color:#64748b;" onclick="closeViewer()">&times;</button>
+    </div>
+    <div class="viewer-modal__body" id="viewer-container"></div>
+    <div class="viewer-modal__controls">
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="workflow-button" onclick="toggleViewerSpin()">Toggle Spin</button>
+        <button type="button" class="workflow-button" onclick="resetViewerCamera()">Reset View</button>
+      </div>
+      <button type="button" class="workflow-button workflow-button--primary" onclick="closeViewer()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let glViewer = null;
+let isSpinning = false;
+
+function copyText(elemId, btn) {
+  const text = document.getElementById(elemId).innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.innerText;
+    btn.innerText = "Copied!";
+    btn.style.background = "#dcfce7";
+    btn.style.borderColor = "#86efac";
+    setTimeout(() => {
+      btn.innerText = orig;
+      btn.style.background = "";
+      btn.style.borderColor = "";
+    }, 2000);
+  });
+}
+
+function openViewer(fileUrl, label) {
+  const modal = document.getElementById("viewer-modal");
+  const title = document.getElementById("viewer-title");
+  title.innerText = label || "3D Structure Viewer";
+  modal.classList.add("open");
+
+  const container = document.getElementById("viewer-container");
+  container.innerHTML = "";
+
+  glViewer = $3Dmol.createViewer(container, { backgroundColor: "#0f172a" });
+
+  fetch(fileUrl)
+    .then(r => r.text())
+    .then(data => {
+      if (typeof glViewer.addModelsAsFrames === "function") {
+        glViewer.addModelsAsFrames(data, "xyz");
+      } else {
+        glViewer.addModel(data, "xyz");
+      }
+      glViewer.setStyle({}, { stick: { radius: 0.15 }, sphere: { scale: 0.28 } });
+      glViewer.zoomTo();
+      glViewer.render();
+      if (glViewer.getNumFrames && glViewer.getNumFrames() > 1) {
+        glViewer.animate({ loop: "forward", interval: 250 });
+      }
+    })
+    .catch(err => {
+      container.innerHTML = `<div style="color:#fff;padding:20px;">Failed to load structure: ${err}</div>`;
+    });
+}
+
+function closeViewer() {
+  document.getElementById("viewer-modal").classList.remove("open");
+  if (glViewer) {
+    glViewer.clear();
+    glViewer = null;
+  }
+}
+
+function toggleViewerSpin() {
+  if (!glViewer) return;
+  isSpinning = !isSpinning;
+  glViewer.spin(isSpinning ? "y" : false);
+}
+
+function resetViewerCamera() {
+  if (!glViewer) return;
+  glViewer.zoomTo();
+  glViewer.render();
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+  // 3D View Buttons
+  document.querySelectorAll(".inspect-3d-btn").forEach(btn => {
+    btn.addEventListener("click", function() {
+      const url = this.getAttribute("data-file-url");
+      const label = this.getAttribute("data-label");
+      openViewer(url, label);
+    });
+  });
+
+  // Energy Unit Switcher
+  const unitBtns = document.querySelectorAll(".unit-btn");
+  const EV_TO_KJ = 96.4853075;
+  const EV_TO_KCAL = 23.0605419;
+
+  function updateUnits(targetUnit) {
+    unitBtns.forEach(b => b.classList.toggle("active", b.getAttribute("data-unit") === targetUnit));
+
+    document.querySelectorAll(".energy-convertible").forEach(el => {
+      const rawText = el.getAttribute("data-raw-val");
+      const numMatch = rawText.match(/[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?/);
+      if (!numMatch) return;
+      const evVal = parseFloat(numMatch[0]);
+
+      let converted = evVal;
+      let unitSuffix = " eV";
+      let precision = 4;
+
+      if (targetUnit === "kJ/mol") {
+        converted = evVal * EV_TO_KJ;
+        unitSuffix = " kJ/mol";
+        precision = 2;
+      } else if (targetUnit === "kcal/mol") {
+        converted = evVal * EV_TO_KCAL;
+        unitSuffix = " kcal/mol";
+        precision = 2;
+      }
+
+      if (el.classList.contains("metric-val")) {
+        el.innerText = `${converted >= 0 && rawText.includes('+') ? '+' : ''}${converted.toFixed(precision)} ${unitSuffix.trim()}`;
+      } else {
+        el.innerText = converted.toFixed(precision);
+      }
+    });
+
+    document.querySelectorAll(".prop-unit").forEach(badge => {
+      const base = badge.getAttribute("data-base-unit");
+      if (base === "eV") {
+        badge.innerText = targetUnit;
+      }
+    });
+  }
+
+  unitBtns.forEach(btn => {
+    btn.addEventListener("click", function() {
+      const u = this.getAttribute("data-unit");
+      updateUnits(u);
+    });
+  });
+
+  // Artifact Search & Filter Chips
+  const searchInput = document.getElementById("artifact-search-input");
+  const filterChips = document.querySelectorAll(".filter-chip");
+  let currentFilter = "all";
+
+  function filterArtifacts() {
+    const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
+    let visibleCount = 0;
+    document.querySelectorAll(".artifact-row").forEach(row => {
+      const kind = (row.getAttribute("data-kind") || "").toLowerCase();
+      const label = (row.getAttribute("data-label") || "").toLowerCase();
+
+      let matchesFilter = true;
+      if (currentFilter === "structure") matchesFilter = kind === "structure";
+      else if (currentFilter === "trajectory") matchesFilter = kind === "trajectory";
+      else if (currentFilter === "image") matchesFilter = kind === "image";
+      else if (currentFilter === "log") matchesFilter = (kind === "log" || kind === "json");
+
+      const matchesSearch = !query || label.includes(query) || kind.includes(query);
+      const isVisible = matchesFilter && matchesSearch;
+      row.style.display = isVisible ? "" : "none";
+      if (isVisible) visibleCount++;
+    });
+    const emptyFilterNotice = document.getElementById("artifacts-empty-filter");
+    if (emptyFilterNotice) {
+      emptyFilterNotice.style.display = visibleCount === 0 ? "block" : "none";
+    }
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener("input", filterArtifacts);
+  }
+
+  filterChips.forEach(chip => {
+    chip.addEventListener("click", function() {
+      filterChips.forEach(c => c.classList.remove("active"));
+      this.classList.add("active");
+      currentFilter = this.getAttribute("data-filter");
+      filterArtifacts();
+    });
+  });
+
+  // Show paths toggle
+  const showPathsCheckbox = document.getElementById("workflow-show-artifact-paths");
+  if (showPathsCheckbox) {
+    showPathsCheckbox.addEventListener("change", function(e) {
+      const cols = document.querySelectorAll(".artifact-path-col");
+      cols.forEach(el => el.style.display = e.target.checked ? "" : "none");
+    });
+  }
+
+  // ASE Open button handlers
+  const workflowCsrfInput = document.querySelector('input[name="csrfmiddlewaretoken"]');
+  const workflowCsrfToken = workflowCsrfInput ? workflowCsrfInput.value : "";
+  const workflowPostJson = async (url, payload) => {
+    const headers = workflowCsrfToken ? { "X-CSRFToken": workflowCsrfToken } : {};
+    if (payload) headers["Content-Type"] = "application/json";
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      credentials: "same-origin",
+      body: payload ? JSON.stringify(payload) : null,
+    });
+    const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+    const data = contentType.includes("application/json")
+      ? await response.json()
+      : { ok: false, error: (await response.text()).slice(0, 300) || "Unexpected response." };
+    if (!response.ok || !data.ok) throw new Error(data.error || "Workflow action failed.");
+    return data;
+  };
+  document.querySelectorAll(".workflow-open-ase-btn").forEach(btn => {
+    btn.addEventListener("click", async function() {
+      const url = this.getAttribute("data-url");
+      if (!url) return;
+      btn.disabled = true;
+      btn.innerText = "Opening...";
+      try {
+        await workflowPostJson(url);
+      } catch (error) {
+        alert(error.message || "Failed to open ASE GUI.");
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "Open ASE";
+      }
+    });
+  });
+
+  // Artifact Ingest button handlers
+  document.querySelectorAll(".workflow-ingest-btn").forEach(btn => {
+    btn.addEventListener("click", async function() {
+      const url = this.getAttribute("data-url");
+      const label = this.getAttribute("data-label") || "artifact";
+      if (!url) return;
+      btn.disabled = true;
+      const originalText = btn.innerText;
+      btn.innerText = "Ingesting...";
+
+      const statusEl = document.getElementById("workflow-action-status");
+      if (statusEl) statusEl.innerText = `Ingesting ${label} via Celery...`;
+
+      try {
+        const data = await workflowPostJson(url);
+        if (statusEl) statusEl.innerText = data.message || `Ingested ${label} successfully.`;
+        location.reload();
+      } catch (error) {
+        if (statusEl) statusEl.innerText = `Ingest failed: ${error.message || error}`;
+        alert(error.message || "Failed to ingest artifact.");
+        btn.disabled = false;
+        btn.innerText = originalText;
+      }
+    });
+  });
+
+  // Render button handlers
+  document.querySelectorAll(".workflow-render-btn").forEach(btn => {
+    btn.addEventListener("click", async function() {
+      const url = this.getAttribute("data-url");
+      const rotId = this.getAttribute("data-rotation-select");
+      const modeId = this.getAttribute("data-mode-select");
+      const outputType = this.getAttribute("data-render-output") || "gif";
+      const rot = rotId ? document.getElementById(rotId).value : "x";
+      const mode = modeId ? document.getElementById(modeId).value : "";
+
+      const statusEl = document.getElementById("workflow-action-status");
+      if (statusEl) statusEl.innerText = "Rendering " + outputType.toUpperCase() + "...";
+
+      btn.disabled = true;
+      try {
+        await workflowPostJson(url, { gif_rot: rot, render_output: outputType, gif_mode: mode || "converged" });
+        if (statusEl) statusEl.innerText = "Render completed successfully!";
+        location.reload();
+      } catch (error) {
+        if (statusEl) statusEl.innerText = "Render failed: " + (error.message || error);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+
+  // Delete image buttons
+  document.querySelectorAll(".workflow-delete-image-btn").forEach(btn => {
+    btn.addEventListener("click", async function() {
+      if (!confirm("Delete this image artifact?")) return;
+      const url = this.getAttribute("data-url");
+      try {
+        await workflowPostJson(url);
+        location.reload();
+      } catch (error) {
+        alert(error.message || "Failed to delete.");
+      }
+    });
+  });
+
+  const cleanDuplicatesBtn = document.getElementById("workflow-delete-duplicate-artifacts-btn");
+  if (cleanDuplicatesBtn) {
+    cleanDuplicatesBtn.addEventListener("click", async function() {
+      if (!confirm("Delete duplicate artifact records?")) return;
+      try {
+        const data = await workflowPostJson(this.getAttribute("data-url"));
+        alert(data.message || "Duplicate cleanup completed.");
+        if (data.removed_count) location.reload();
+      } catch (error) {
+        alert(error.message || "Duplicate cleanup failed.");
+      }
+    });
+  }
+});
+</script>
+{% endblock %}
