@@ -40,9 +40,9 @@ Mulliken-only recovery uses `standard`/`short` (or equivalent active HPC queue),
 
 Where adsorption or interaction strength is part of the comparison, calculate the bare cluster at the complex geometry with the same electronic settings, then evaluate
 
-\[
+$$
 E_{\mathrm{ref}} = E_{\mathrm{complex}}-E_{\mathrm{cluster@complex}}-\sum_j E_j^{\mathrm{gas}}.
-\]
+$$
 
 Gas-phase energies must be obtained from identified Reaction Hub reference workflows at matching settings, not copied as constants into the protocol. Report electronic energies to 2 dp and state that BSSE, ZPE and thermal corrections are absent.
 
@@ -64,13 +64,13 @@ Run Multiwfn IFCT using the Molden wavefunction and ORCA excitation output belon
 - nanocluster → adsorbate and adsorbate → nanocluster;
 - inter-adsorbate terms for coadsorbed systems.
 
-For a wavelength interval \(B\), report the oscillator-strength-weighted contribution
+For a wavelength interval $B$, report the oscillator-strength-weighted contribution
 
-\[
+$$
 W_B(A\rightarrow B)=\frac{\sum_{i\in B} f_i p_i(A\rightarrow B)}{\sum_{i\in B}f_i},
-\]
+$$
 
-only when \(\sum_{i\in B}f_i>0\). Retain both the per-state data and the stated interval; do not call 300–800 nm the complete visible range.
+only when $\sum_{i\in B}f_i>0$. Retain both the per-state data and the stated interval; do not call 300–800 nm the complete visible range.
 
 **Rationale:** IFCT supplies directionality that an absorption spectrum alone cannot provide.
 

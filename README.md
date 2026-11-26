@@ -6,6 +6,8 @@ Other contributors before first release: Thomas Hill, Oliver Morris, Yunyu Zhang
 Computational photo- and thermal catalysis workflows and analysis tools, developed through research within CPLAS.
 Focus is on streamlined processes and agentic capabilities.
 
+Agentic tools in use: Codex and Gemini.
+
 ## Repository Structure
 
 - `cats/` — Core atomistic simulation toolkit: ORCA, NWChem, Multiwfn, VASP, POV-Ray rendering, spectrum/structure visualization, and active-learning / TDDFT / NEB / dimer workflows.

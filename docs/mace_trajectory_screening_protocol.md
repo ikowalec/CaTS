@@ -60,31 +60,51 @@ Combined `.xyz` files aggregate multiple relaxation runs into a flat sequence of
 3. **Geometric Continuity**: If all-atom pair distance RMSD between adjacent frames exceeds 1.5 Å, a new trajectory is declared to prevent conflating distinct reaction cascades.
 
 ### 1.2 Mandatory Endpoint Retention
-- **Initial Frame (‖F‖t_0‖F‖)**: Captures the non-equilibrium starting geometry (often perturbed, adsorbed, or pre-reaction complexes).
-- **Final Frame (‖F‖t_{\text{final}}‖F‖)**: Captures the relaxed local minimum with near-zero residual forces (‖F‖F_{\max} \to 0‖F‖).
+- **Initial Frame ($t_0$)**: Captures the non-equilibrium starting geometry (often perturbed, adsorbed, or pre-reaction complexes).
+- **Final Frame ($t_{\text{final}}$)**: Captures the relaxed local minimum with near-zero residual forces ($F_{\max} \to 0$).
 
 ### 1.3 High-Force Barrier State Retention
 Frames exhibiting maximum atomic force magnitude:
-‖F‖‖F‖\max_i \|\mathbf{F}_i\| \ge F_{\text{thresh}} \quad (\text{default: } 5.0\text{ eV/\AA})‖F‖‖F‖
+
+$$
+\max_i \|\mathbf{F}_i\| \ge F_{\text{thresh}} \quad (\text{default: } 5.0\text{ eV/\AA})
+$$
+
 are preserved regardless of similarity downsampling. These structures sample repulsive walls, bond breaking/forming events, and high-energy saddle regions essential for MD stability without unphysical cluster explosion.
 
 ### 1.4 High-Energy State Retention
-Frames with per-atom potential energy exceeding the trajectory baseline by ‖F‖\ge 0.50\text{ eV/atom}‖F‖ are prioritized to ensure adequate sampling of excited or distorted configurations.
+Frames with per-atom potential energy exceeding the trajectory baseline by $\ge 0.50\text{ eV/atom}$ are prioritized to ensure adequate sampling of excited or distorted configurations.
 
 ### 1.5 Geometric Similarity Screening (SOAP REMatch Kernel)
 Intermediate frames between endpoints are filtered sequentially against the set of already accepted structures following the repository's established REMatch similarity rules (`similarity.rematch.memory_rematch`):
 1. **SOAP Descriptor**:
-   ‖F‖‖F‖\text{SOAP}(r_{\text{cut}} = 6.0\text{ \AA}, n_{\max} = 8, l_{\max} = 6)‖F‖‖F‖
-   constructed across the unique chemical species in the dataset and normalized via ‖F‖\ell_2‖F‖ norm.
+
+   $$
+   \text{SOAP}(r_{\text{cut}} = 6.0\text{ \AA}, n_{\max} = 8, l_{\max} = 6)
+   $$
+
+   constructed across the unique chemical species in the dataset and normalized via $\ell_2$ norm.
 2. **REMatch Kernel Similarity & Dynamic Per-Trajectory Threshold**:
-   ‖F‖‖F‖K(\mathbf{A}, \mathbf{B}) \in [0, 1] \quad (\text{RBF metric, } \gamma = 1.0, \alpha = 1.0)‖F‖‖F‖
-   Rather than applying a brittle uniform threshold across all trajectories, the screener computes an **adaptive threshold per trajectory** via the repository's elbow gap / ‖F‖p_{95}‖F‖ percentile heuristic (`suggest_similarity_threshold`). This scales with the trajectory's intrinsic structural spread, ensuring small-displacement relaxations are not entirely dropped and large structural reorganizations are not over-sampled:
-   ‖F‖‖F‖\max_{S \in \text{kept}} K(\mathbf{A}, S) \ge K_{\text{threshold}}^{\text{(dynamic)}} \implies \text{redundant duplicate}‖F‖‖F‖
+
+   $$
+   K(\mathbf{A}, \mathbf{B}) \in [0, 1] \quad (\text{RBF metric, } \gamma = 1.0, \alpha = 1.0)
+   $$
+
+   Rather than applying a brittle uniform threshold across all trajectories, the screener computes an **adaptive threshold per trajectory** via the repository's elbow gap / $p_{95}$ percentile heuristic (`suggest_similarity_threshold`). This scales with the trajectory's intrinsic structural spread, ensuring small-displacement relaxations are not entirely dropped and large structural reorganizations are not over-sampled:
+
+   $$
+   \max_{S \in \text{kept}} K(\mathbf{A}, S) \ge K_{\text{threshold}}^{\text{(dynamic)}} \implies \text{redundant duplicate}
+   $$
+
 3. **Energy Difference Override**:
-   ‖F‖‖F‖\frac{|E_{\mathbf{A}} - E_{\mathbf{B}}|}{N} \ge 0.02\text{ eV/atom}‖F‖‖F‖
+
+   $$
+   \frac{|E_{\mathbf{A}} - E_{\mathbf{B}}|}{N} \ge 0.02\text{ eV/atom}
+   $$
+
    retains structures with significant electronic/potential energy deviation even when borderline geometric similarity occurs.
 4. **Max Intermediate Cap**: By default, at most 5 intermediate frames are retained per trajectory to prevent over-representing lengthy, slow-converging relaxations.
-5. **Fallback Metric**: All-atom pair distance RMSD (‖F‖\text{RMSD} \ge 0.08\text{ \AA}‖F‖) serves as fallback if DScribe is unavailable.
+5. **Fallback Metric**: All-atom pair distance RMSD ($\text{RMSD} \ge 0.08\text{ \AA}$) serves as fallback if DScribe is unavailable.
 
 ---
 
@@ -92,7 +112,7 @@ Intermediate frames between endpoints are filtered sequentially against the set 
 
 MACE expects consistent reference energy and force keys. The screener standardizes all outputs:
 - **`REF_energy`**: Extracted from ASE `SinglePointCalculator.energy` or existing `energy`/`free_energy` info tags, stored as scalar float in `atoms.info["REF_energy"]`.
-- **`REF_forces`**: Extracted from ASE `SinglePointCalculator.forces` or `forces` array, stored as an ‖F‖(N, 3)‖F‖ float array in `atoms.arrays["REF_forces"]`.
+- **`REF_forces`**: Extracted from ASE `SinglePointCalculator.forces` or `forces` array, stored as an $(N, 3)$ float array in `atoms.arrays["REF_forces"]`.
 
 Both keys are written into standard ASE `extxyz` format, ready for direct ingestion by `mace_run_train`.
 
@@ -117,10 +137,10 @@ gui_tools/
 ### Key GUI Features
 1. **Input File Chooser & Fast Inspection**: Instantly analyzes selected `.xyz` files, displaying total structure count, file size (MB), element list, and sample chemical formula.
 2. **Customizable Parameters**:
-   - High Force Barrier Threshold (‖F‖F_{\max}‖F‖, default: 5.0 eV/Å)
+   - High Force Barrier Threshold ($F_{\max}$, default: 5.0 eV/Å)
    - Pair Distance RMSD Cutoff (default: 0.08 Å)
-   - Energy Variance Cutoff (default: ‖F‖0.02\text{ eV/atom}‖F‖)
-   - Max Intermediate Frames (default: ‖F‖5‖F‖)
+   - Energy Variance Cutoff (default: 0.02 eV/atom)
+   - Max Intermediate Frames (default: 5)
    - Checkbox to toggle dynamic per-trajectory similarity thresholding.
    - Checkbox to export detailed audit CSV report.
    - Automatic dual tagging: standard calculator properties (`forces`, `energy`) and MACE reference tags (`REF_forces`, `REF_energy`) are always attached automatically.
@@ -169,10 +189,10 @@ print(f"Memory / disk savings: {results['file_savings_pct']:.1f}%")
 ## 5. Typical Memory & Performance Gains
 
 Benchmarked on `mace_training.xyz` (1,020 raw ORCA relaxation structures across 324 trajectories):
-- **Raw Structures**: 1,020 frames (‖F‖3.45\text{ MB}‖F‖)
-- **Retained Endpoints**: 586 frames (‖F‖t_0‖F‖ and ‖F‖t_{\text{final}}‖F‖)
-- **Retained High-Force States**: 10 frames (‖F‖F_{\max} \ge 5.0\text{ eV/\AA}‖F‖)
-- **Retained Intermediate States**: 60 frames (‖F‖\text{RMSD} \ge 0.08\text{ \AA}‖F‖)
-- **Screened Total**: 656 frames (‖F‖2.22\text{ MB}‖F‖)
+- **Raw Structures**: 1,020 frames (3.45 MB)
+- **Retained Endpoints**: 586 frames ($t_0$ and $t_{\text{final}}$)
+- **Retained High-Force States**: 10 frames ($F_{\max} \ge 5.0\text{ eV/\AA}$)
+- **Retained Intermediate States**: 60 frames ($\text{RMSD} \ge 0.08\text{ \AA}$)
+- **Screened Total**: 656 frames (2.22 MB)
 - **Structure Reduction**: -35.7% (up to -80% on long unrelaxed MD trajectories)
-- **Speedup Factor**: ‖F‖\sim 1.55\times‖F‖ faster MACE training epochs with improved validation metrics due to de-correlated data.
+- **Speedup Factor**: $\sim 1.55\times$ faster MACE training epochs with improved validation metrics due to de-correlated data.
