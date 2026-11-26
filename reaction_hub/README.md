@@ -54,44 +54,7 @@ tips; dashboard dependencies do not install cluster software or model weights.
 
 ## Main Commands
 
-- Merge parsed legacy ORCA catalogs:
-
-```bash
-python manage.py import_legacy_catalog --catalog-root /path/to/parsed/catalogs --dry-run
-python manage.py import_legacy_catalog --catalog-root /path/to/parsed/catalogs
-```
-
-The import is idempotent and creates jobless workflow runs. Numerical TDDFT,
-UV/Vis, and charge-transfer data is stored in the versioned
-`spectral_dataset` computed property so plots can be recreated without access
-to the original files. Exact ORCA inputs/settings, final atomic charges, scan
-coordinates/forces, and a checksummed companion-file manifest are also
-retained. Referenced artifacts are stored relative to each calculation so
-their identity survives filesystem moves; missing files do not stop the
-import. New catalogs also carry content-derived per-calculation fingerprints,
-so reparsing an unchanged tree after an HPC path-prefix move does not create
-new runs.
-
-Rerunning `python -m cats.orca.legacy_catalog` reuses unchanged schema-compatible
-catalog entries by default. The parser hashes the complete calculation file
-manifest and reparses only calculations whose inputs or companion files have
-changed. Invoke `python -m cats.orca.legacy_catalog ... --no-reuse` to force a
-clean reparse.
-
-If the source tree has moved since parsing, point the import at its current
-root. For a parallel catalog tree, the catalog-relative subdirectory is
-automatically appended:
-
-```bash
-python manage.py import_legacy_catalog \
-  --catalog-root /path/to/parsed/catalogs \
-  --source-root /new/hpc/prefix/or/archived/source/root
-```
-
-Rerun the same command with a new `--source-root` after a later move to update
-run working directories without changing run or artifact identities.
-
-- Backfill the same replot-ready spectral representation for existing modern
+- Backfill replot-ready `spectral_dataset` representations for existing modern
   runs from retained transition properties and accessible spectrum CSVs:
 
 ```bash
